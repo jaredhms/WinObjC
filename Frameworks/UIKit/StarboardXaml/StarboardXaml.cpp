@@ -17,7 +17,6 @@
 // clang-format off
 
 #include "ApplicationMain.h"
-#include "LayerRegistration.h"
 #include "StringConversion.h"
 #include "Windows.UI.Xaml.h"
 

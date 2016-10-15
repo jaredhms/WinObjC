@@ -43,7 +43,7 @@ static const int c_largeSquareLength = 37;
 */
 - (instancetype)initWithCoder:(NSCoder*)coder {
     if (self = [super initWithCoder:coder]) {
-        [self _UIActivityIndicatorView_initInternal:nil];
+        [self _initUIActivityIndicatorView:nil];
 
         if ([coder containsValueForKey:@"UIHidesWhenStopped"]) {
             [self setHidesWhenStopped:[coder decodeInt32ForKey:@"UIHidesWhenStopped"]];
@@ -96,7 +96,7 @@ static const int c_largeSquareLength = 37;
 */
 - (instancetype)initWithActivityIndicatorStyle:(UIActivityIndicatorViewStyle)style {
     if (self = [super initWithFrame:CGRectZero]) {
-        [self _UIActivityIndicatorView_initInternal:nil];
+        [self _initUIActivityIndicatorView:nil];
         [self setActivityIndicatorViewStyle:style];
     }
 
@@ -107,12 +107,15 @@ static const int c_largeSquareLength = 37;
  @Status Interoperable
 */
 - (instancetype)initWithFrame:(CGRect)frame {
-    return [self _initWithFrame:frame xamlElement:nil];
+    return [self initWithFrame:frame xamlElement:nil];
 }
 
-- (instancetype)_initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
-    if (self = [super initWithFrame:frame]) {
-        [self _UIActivityIndicatorView_initInternal:xamlElement];
+/**
+ Microsoft Extension
+*/
+- (instancetype)initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
+    if (self = [super initWithFrame:frame xamlElement:xamlElement]) {
+        [self _initUIActivityIndicatorView:xamlElement];
     }
 
     return self;
@@ -127,17 +130,18 @@ static const int c_largeSquareLength = 37;
     _subView.center = { self.center.x - self.frame.origin.x, self.center.y - self.frame.origin.y };
 }
 
-- (void)_UIActivityIndicatorView_initInternal:(WXFrameworkElement*)xamlElement {
+- (void)_initUIActivityIndicatorView:(WXFrameworkElement*)xamlElement {
     if (xamlElement != nil && [xamlElement isKindOfClass:[WXCProgressRing class]]) {
         _progressRing = static_cast<WXCProgressRing*>(xamlElement);
     } else {
         _progressRing = [WXCProgressRing make];
     }
 
-    _subView = [[UIView alloc] initWithFrame:CGRectZero];
-
-    [_subView setXamlElement:_progressRing];
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // TODO: WE SHOULD MOVE THIS OVER TO A SINGLE XAML ELEMENT WHICH WE CAN RETURN FROM AN + (WXFrameworkElement*)createXamlElement; IMPL
+    _subView = [[UIView alloc] initWithFrame:CGRectZero xamlElement:_progressRing];
     [self addSubview:_subView];
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     _isAnimating = NO;
     [self setHidesWhenStopped:YES];

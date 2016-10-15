@@ -79,7 +79,7 @@ struct ButtonState {
 */
 - (instancetype)initWithCoder:(NSCoder*)coder {
     if (self = [super initWithCoder:coder]) {
-        [self _UIButton_initInternal:nil];
+        [self _initUIButton];
 
         if ([coder containsValueForKey:@"UIDisabled"]) {
             BOOL disabled = [coder decodeIntegerForKey:@"UIDisabled"];
@@ -155,11 +155,11 @@ struct ButtonState {
     [self _processPointerEvent:e forTouchPhase:UITouchPhaseCancelled];
 }
 
-- (void)_UIButton_initInternal:(WXFrameworkElement*)xamlElement {
-    if (xamlElement != nil && [xamlElement isKindOfClass:[WXCButton class]]) {
-        _xamlButton.attach(static_cast<WXCButton*>(xamlElement));
-    } else {
-        _xamlButton.attach(XamlControls::CreateButton());
+- (void)_initUIButton {
+    // Store a strongly-typed backing button
+    _xamlButton = rt_dynamic_cast<WXCButton>([self xamlElement]);
+    if (!_xamlButton) {
+        FAIL_FAST();
     }
 
     // Force-load the template, and get the TextBlock and Image for use in our proxies.
@@ -221,27 +221,35 @@ struct ButtonState {
                                       // intrinsicContentSize is invalidated.
                                       [weakSelf setNeedsLayout];
                                   });
-
-    [self layer].contentsElement = _xamlButton;
 }
 
-- (instancetype)_initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
+/**
+ @Status Interoperable
+*/
+- (instancetype)initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
-        [self _UIButton_initInternal:xamlElement];
+        [self _initUIButton];
     }
 
     return self;
 }
 
 /**
- @Status Interoperable
+Microsoft Extension
 */
-- (instancetype)initWithFrame:(CGRect)pos {
-    if (self = [super initWithFrame:pos]) {
-        [self _UIButton_initInternal:nil];
+-(instancetype)initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
+    if (self = [super initWithFrame:frame xamlElement:xamlElement]) {
+        [self _initUIButton];
     }
 
     return self;
+}
+
+/**
+ Microsoft Extension
+*/
++ (WXFrameworkElement*)createXamlElement {
+    return XamlControls::CreateButton();
 }
 
 /**

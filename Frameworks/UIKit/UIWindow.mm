@@ -33,8 +33,6 @@
 
 static const wchar_t* TAG = L"UIWindow";
 
-UIWindow* m_pMainWindow = NULL;
-
 UIWindow* _curKeyWindow = nil;
 
 NSString* const UIWindowDidBecomeVisibleNotification = @"UIWindowDidBecomeVisibleNotification";
@@ -104,10 +102,6 @@ const UIWindowLevel UIWindowLevelStatusBar = 1000.0f;
 }
 
 static void initInternal(UIWindow* self, CGRect pos) {
-    if (m_pMainWindow == NULL) {
-        m_pMainWindow = (UIWindow*)(id)self;
-    }
-
     CALayer* ourLayer = [self layer];
     [ourLayer setOpaque:FALSE];
     [ourLayer _setRootLayer:TRUE];
@@ -122,7 +116,6 @@ static void initInternal(UIWindow* self, CGRect pos) {
 }
 
 - (void)_destroy {
-    m_pMainWindow = NULL;
     [CATransaction _removeLayer:[self layer]];
     [static_cast<NSMutableArray*>([[UIApplication sharedApplication] windows]) removeObject:self];
     [self resignKeyWindow];
@@ -182,13 +175,6 @@ static void initInternal(UIWindow* self, CGRect pos) {
 
 - (NSObject*)_getWindowInternal {
     return self;
-}
-
-/**
- @Status Interoperable
-*/
-+ (UIWindow*)mainWindow {
-    return (UIWindow*)m_pMainWindow;
 }
 
 -(void)_moveToTopOfSameLevel {
@@ -376,7 +362,6 @@ static void initInternal(UIWindow* self, CGRect pos) {
  @Status Interoperable
 */
 - (void)dealloc {
-    m_pMainWindow = NULL;
     [CATransaction _removeLayer:[self layer]];
     [static_cast<NSMutableArray*>([[UIApplication sharedApplication] windows]) removeObject:self];
 

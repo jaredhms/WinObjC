@@ -16,6 +16,7 @@
 #pragma once
 #include <deque>
 #include <map>
+#include <set>
 
 #include "CACompositor.h"
 #include "winobjc\winobjc.h"
@@ -40,10 +41,11 @@ class RefCountedType {
     friend class RefCounted;
     int refCount;
 
-protected:
+public:
     void AddRef();
     void Release();
 
+protected:
     RefCountedType();
     virtual ~RefCountedType();
 };
@@ -125,7 +127,7 @@ public:
     Easing easingFunction;
 
     DisplayAnimation();
-    virtual ~DisplayAnimation();
+    virtual ~DisplayAnimation() {};
 
     virtual void Completed() = 0;
     virtual concurrency::task<void> AddToNode(DisplayNode* node) = 0;
@@ -140,119 +142,87 @@ public:
 };
 
 class DisplayTexture : public RefCountedType {
-    friend class CAXamlCompositor;
-
 public:
     virtual ~DisplayTexture(){};
-    virtual void SetNodeContent(DisplayNode* node, float contentWidth, float contentHeight, float contentScale) = 0;
+    virtual const Microsoft::WRL::ComPtr<IInspectable>& GetContent() const = 0;
+
+protected:
+    Microsoft::WRL::ComPtr<IInspectable> _xamlImage;
 };
 
-class DisplayTextureXamlGlyphs : public DisplayTexture {
-public:
-    winobjc::Id _xamlTextbox;
-
-    enum DisplayTextureTextHAlignment { alignLeft, alignCenter, alignRight };
-
-    DisplayTextureTextHAlignment _horzAlignment;
-    float _insets[4];
-    float _color[4];
-    float _fontSize;
-    float _lineHeight;
-    bool _centerVertically;
-    bool _isBold = false;
-    bool _isItalic = false;
-
-    DisplayTextureXamlGlyphs();
-    ~DisplayTextureXamlGlyphs();
-
-    float _desiredWidth, _desiredHeight;
-    void Measure(float width, float height);
-    void ConstructGlyphs(const char* fontName, const wchar_t* str, int len);
-    void SetNodeContent(DisplayNode* node, float width, float height, float scale);
-};
-
-#include <set>
 
 class CAXamlCompositor;
 
+///////////////////////////////////////////////////////////////////////////////////////////////
+// TODO: GET RID OF RefCountedType - MOVE TO shared_ptr for all of these!
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// A DisplayNode is CALayer's proxy to its backing Xaml FrameworkElement.  DisplayNodes
+// are used to update the Xaml FrameworkElement's visual state (positioning, animations, etc.) based upon CALayer API calls, 
+// and it's also responsible for the CALayer's sublayer management (*if* that backing Xaml FrameworkElement supports sublayers).
+// When constructed, the DisplayNode inspects the passed-in Xaml FrameworkElement, and lights up all CALayer functionality that's
+// supported by the given FrameworkElement.
 class DisplayNode : public RefCountedType {
-    friend class CAXamlCompositor;
-
 public:
-    bool isRoot;
-    DisplayNode* parent;
-    std::set<DisplayNodeRef> _subnodes;
-    DisplayTextureRef currentTexture;
-    bool topMost;
+    // The Xaml element that backs this DisplayNode
+    Microsoft::WRL::ComPtr<IInspectable> _xamlElement;
 
-    // A DisplayNode map to a visual control which participates in layout. During layout, a display node will be positioned
-    // within its parent display node. Also, The visual control in a display node must maintain and arrange visual elements
-    // represented by child display nodes
-    //
-    // The visual control can be simple control control, etc Canvas, Grid.  In this case, the control itself is naturally
-    // used for participating layout within its parent visual control as well as laying out its child visual elements purpose.
-    //
-    // For complex (or composite) control, e.g., UIScrollView - which is a control with several layer, e.g.,
-    // an backing panel behind, the scrollViewer in the middle and the cavas on the top layer. The backing panel should particiate
-    // the layout with its parent. But it is the canvas is responsbile for laying out child visual elements represented
-    // by the child display node
-    //
-    // For this reason, we differentiate two types of visual elements for a DisplayNode - the layoutElement and the
-    // contentElement. For simple case, both refer to the same visual element. For compoiste control case, they refer to
-    // different visual elements.
-    //
-    // Conceptually, you can consider layoutElement as the root visual layer in a display node, and contentElement as
-    // the top most visual layer in the display node. Both has implicit requirements - they must be sublcass of Panel
+    explicit DisplayNode(IInspectable* xamlElement);
+    ~DisplayNode();
 
-    winobjc::Id _layoutElement; // used for layout with parent of the display node
-    winobjc::Id _contentElement; // used for layout with the children of the display node
-
-public:
-    DisplayNode();
-    virtual ~DisplayNode();
-
-    void SetTopMost();
+    // Animation support
     concurrency::task<void> AddAnimation(DisplayAnimation* animation);
+
+    // Display properties
     void SetProperty(const wchar_t* name, float value);
     void SetPropertyInt(const wchar_t* name, int value);
     void SetHidden(bool hidden);
     void SetMasksToBounds(bool masksToBounds);
     void SetBackgroundColor(float r, float g, float b, float a);
+    void SetTexture(DisplayTexture* texture, float width, float height, float scale);
+    void SetContents(const Microsoft::WRL::ComPtr<IInspectable>& bitmap, float width, float height, float scale);
     void SetContentsCenter(float x, float y, float width, float height);
-    void SetContents(winobjc::Id& bitmap, float width, float height, float scale);
-    void SetContents(DisplayTexture* tex, float width, float height, float scale);
-    void SetContentsElement(winobjc::Id& elem, float width, float height, float scale);
-    void SetContentsElement(winobjc::Id& elem);
-
     void SetShouldRasterize(bool shouldRasterize);
 
-    // Setting the root control and the content control for scrollviewer
-    // this is needed because root control will be the first child of CALayerXaml
-    // and the content control will be the one to layout children
-    void SetScrollviewerControls(IInspectable* rootControl, IInspectable* contentControl);
-
-    float GetPresentationPropertyValue(const char* name);
-    void AddToRoot();
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // TODO: SHOULD REMOVE AND JUST DO ON UIWINDOW'S CANVAS
     void SetNodeZIndex(int zIndex);
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    virtual void* GetProperty(const char* name) = 0;
-    virtual void UpdateProperty(const char* name, void* value) = 0;
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // TODO: CAN/SHOULD WE REMOVE THIS?
+    void SetTopMost();
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    // General property management
+    void* GetProperty(const char* name);
+    void UpdateProperty(const char* name, void* value);
+
+    // Sublayer management
+    void AddToRoot();
     void AddSubnode(DisplayNode* node, DisplayNode* before, DisplayNode* after);
     void MoveNode(DisplayNode* before, DisplayNode* after);
     void RemoveFromSupernode();
+
+protected:
+    // Property management
+    float _GetPresentationPropertyValue(const char* name);
+
+    bool _isRoot;
+    DisplayNode* _parent;
+    std::set<DisplayNodeRef> _subnodes;
+    DisplayTextureRef _currentTexture;
+    bool _topMost;
 };
 
 struct ICompositorTransaction {
 public:
-    virtual ~ICompositorTransaction() {
-    }
+    virtual ~ICompositorTransaction() {}
     virtual void Process() = 0;
 };
 
 struct ICompositorAnimationTransaction {
 public:
-    virtual ~ICompositorAnimationTransaction() {
-    }
+    virtual ~ICompositorAnimationTransaction() {}
     virtual concurrency::task<void> Process() = 0;
 };
 
