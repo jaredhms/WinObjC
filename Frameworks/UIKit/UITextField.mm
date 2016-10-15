@@ -92,8 +92,9 @@ void SetTextControlContentVerticalAlignment(WXCControl* control, WXVerticalAlign
     BOOL _enablesReturnKeyAutomatically;
 
     // backing xaml textbox and passwordBox
-    WXCTextBox* _textBox;
-    WXCPasswordBox* _passwordBox;
+    StrongId<UIView> _subView; // Container UIView for the Xaml textbox or passwordbox
+    WXCTextBox* _textBox; // Backing xaml textbox
+    WXCPasswordBox* _passwordBox; // Backing xaml passwordbox
 
     // lock use to access the properties
     StrongId<NSRecursiveLock> _secureModeLock;
@@ -815,10 +816,8 @@ void SetTextControlContentVerticalAlignment(WXCControl* control, WXVerticalAlign
         _secureTextMode = secure;
         if (_secureTextMode) {
             [self _initPasswordBox:nil];
-            [self setXamlElement:_passwordBox];
         } else {
             [self _initTextBox:nil];
-            [self setXamlElement:_textBox];
         }
     }
     [_secureModeLock unlock];
@@ -854,7 +853,7 @@ void SetTextControlContentVerticalAlignment(WXCControl* control, WXVerticalAlign
         _backgroundImage = nil;
         _isFirstResponder = NO;
 
-        [self _initTextField:nil];
+        [self _initUITextField:nil];
     }
 
     return self;
@@ -864,11 +863,13 @@ void SetTextControlContentVerticalAlignment(WXCControl* control, WXVerticalAlign
  @Status Interoperable
 */
 - (instancetype)initWithFrame:(CGRect)frame {
-    return [self _initWithFrame:frame xamlElement:nil];
+    return [self initWithFrame:frame xamlElement:nil];
 }
 
-- (id)_initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
-    if (self = [super initWithFrame:frame]) {
+- (id)initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
+    // TODO: We're passing nil to initWithFrame:xamlElement: because we have to *contain* either a TextBox or a PasswordBox.
+    // Pass xamlElement instead once we move to a *single* backing Xaml element for UITextField.
+    if (self = [super initWithFrame:frame xamlElement:nil]) {
         _font = [UIFont fontWithName:@"Helvetica" size:[UIFont labelFontSize]];
         _alignment = UITextAlignmentLeft;
         _borderStyle = UITextBorderStyleNone;
@@ -880,7 +881,7 @@ void SetTextControlContentVerticalAlignment(WXCControl* control, WXVerticalAlign
         _spellCheckingType = UITextSpellCheckingTypeDefault;
         _isFirstResponder = NO;
 
-        [self _initTextField:xamlElement];
+        [self _initUITextField:xamlElement];
     }
 
     return self;
@@ -1208,6 +1209,14 @@ void SetTextControlContentVerticalAlignment(WXCControl* control, WXVerticalAlign
     [self _setupControlGotFocusHandler:_textBox];
     [self _setupControlLostFocusHandler:_textBox];
     [self _setupControlKeyDownHandler:_textBox];
+
+    // Remove the old subview (if it exists)
+    [_subView removeFromSuperview];
+
+    // Create a new view for the xaml element and add it as a subview of ourselves
+    _subView = [[UIView alloc] initWithFrame:self.bounds xamlElement:_textBox];
+    [_subView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+    [self addSubview:_subView];
 }
 
 // Helper to Initialize passwordBox
@@ -1259,10 +1268,18 @@ void SetTextControlContentVerticalAlignment(WXCControl* control, WXVerticalAlign
     [self _setupControlGotFocusHandler:_passwordBox];
     [self _setupControlLostFocusHandler:_passwordBox];
     [self _setupControlKeyDownHandler:_passwordBox];
+
+    // Remove the old subview (if it exists)
+    [_subView removeFromSuperview];
+
+    // Create a new view for the xaml element and add it as a subview of ourselves
+    _subView = [[UIView alloc] initWithFrame:self.bounds xamlElement:_passwordBox];
+    [_subView setAutoresizingMask:UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight];
+    [self addSubview:_subView];
 }
 
 // Main entrance to initialize TextField
-- (void)_initTextField:(WXFrameworkElement*)xamlElement {
+- (void)_initUITextField:(WXFrameworkElement*)xamlElement {
     self->_secureModeLock = [NSRecursiveLock new];
 
     // creating dummy button and hidden view so that it can be used to steal/kill the focus for this UITextField
@@ -1271,16 +1288,13 @@ void SetTextControlContentVerticalAlignment(WXCControl* control, WXVerticalAlign
     self->_dummyButton.isEnabled = YES;
     self->_dummyButton.isTabStop = YES;
 
-    self->_hiddenView = [[_UIHiddenButtonView alloc] initWithFrame:CGRectZero];
-    [self->_hiddenView setXamlElement:self->_dummyButton];
-    [self addSubview:self->_hiddenView];
+    _hiddenView = [[_UIHiddenButtonView alloc] initWithFrame:CGRectZero xamlElement:_dummyButton];
+    [self addSubview:_hiddenView];
 
     if (self->_secureTextMode) {
         [self _initPasswordBox:nil];
-        [self setXamlElement:self->_passwordBox];
     } else {
         [self _initTextBox:xamlElement];
-        [self setXamlElement:self->_textBox];
     }
 }
 

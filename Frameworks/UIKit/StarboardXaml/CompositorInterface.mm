@@ -36,6 +36,7 @@
 #import <algorithm>
 #import <deque>
 #import <map>
+#import <mutex>
 #import <algorithm>
 #import "CompositorInterface.h"
 #import "CAAnimationInternal.h"
@@ -51,12 +52,13 @@
 #import <UWP/WindowsDevicesInput.h>
 #import "UIColorInternal.h"
 
+using namespace Microsoft::WRL;
+
 static const wchar_t* TAG = L"CompositorInterface";
 
 @class RTObject;
 
 CompositionMode g_compositionMode = CompositionModeDefault;
-bool dxLandscape = false;
 
 float screenWidth = 320.0f;
 float screenHeight = 480.0f;
@@ -67,24 +69,26 @@ bool tabletMode = false;
 float screenXDpi = 180, screenYDpi = 180;
 int deviceWidth = 640, deviceHeight = 1136;
 
-winobjc::Id CreateBitmapFromBits(void* ptr, int width, int height, int stride);
-winobjc::Id CreateBitmapFromImageData(const void* ptr, int len);
-winobjc::Id CreateWritableBitmap(int width, int height);
-void* LockWritableBitmap(winobjc::Id& bitmap, void** ptr, int* stride);
-void UnlockWritableBitmap(winobjc::Id& bitmap, void* byteAccess);
-void SetSwapchainScale(winobjc::Id& panel, float scale);
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// TODO: MOVE TO BITMAP MANAGMENT API
+ComPtr<IInspectable> CreateBitmapFromBits(void* ptr, int width, int height, int stride);
+ComPtr<IInspectable> CreateBitmapFromImageData(const void* ptr, int len);
+ComPtr<IInspectable> CreateWritableBitmap(int width, int height);
+ComPtr<IInspectable> LockWritableBitmap(const ComPtr<IInspectable>& bitmap, void** ptr, int* stride);
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
 void SetScreenParameters(float width, float height, float magnification, float rotation);
 void SetRootGrid(winobjc::Id& root);
 
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// TODO: MOVE TO DisplayLink API
 void EnableRenderingListener(void (*callback)());
 void DisableRenderingListener();
 
 void OnRenderedFrame() {
     CASignalDisplayLink();
 }
-
-#import <mutex>
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::mutex _displayTextureCacheLock;
 std::map<CGImageRef, DisplayTextureRef> _displayTextureCache;
@@ -118,10 +122,6 @@ void UIReleaseDisplayTextureForCGImage(CGImageRef img) {
     SetCachedDisplayTextureForImage(img, NULL);
 }
 
-void SetImageDestructionCallbacks() {
-    CGImageAddDestructionListener(UIReleaseDisplayTextureForCGImage);
-}
-
 void RefCountedType::AddRef() {
     assert(refCount > 0 && refCount != 0xDDDDDDDD);
     EbrIncrement(&refCount);
@@ -141,25 +141,9 @@ RefCountedType::RefCountedType() {
 RefCountedType::~RefCountedType() {
 }
 
-class GenericControlXaml : public DisplayTexture {
-public:
-    winobjc::Id _xamlView;
-
-    GenericControlXaml(const Microsoft::WRL::ComPtr<IUnknown>& view) {
-        _xamlView = view;
-    }
-
-    void SetNodeContent(DisplayNode* node, float width, float height, float scale) {
-        node->SetContentsElement(_xamlView);
-    }
-};
-
 class DisplayTextureContent : public DisplayTexture {
-    winobjc::Id _xamlImage;
-    const char* name;
-
 public:
-    DisplayTextureContent(CGImageRef img) : name("TextureBitmap") {
+    DisplayTextureContent(CGImageRef img) {
         if (img->_imgType == CGImageTypePNG || img->_imgType == CGImageTypeJPEG) {
             const void* data = NULL;
             bool freeData = false;
@@ -223,7 +207,6 @@ public:
             }
             return;
         }
-        lockPtr = NULL;
 
         int texWidth = img->Backing()->Width();
         int texHeight = img->Backing()->Height();
@@ -280,84 +263,27 @@ public:
         CGImageRelease(pNewImage);
     }
 
-    DisplayTextureContent(int width, int height) : name("TextureDirect") {
-        lockPtr = NULL;
+    DisplayTextureContent(int width, int height) {
         _xamlImage = CreateWritableBitmap(width, height);
     }
 
-    void* lockPtr;
-
     void* LockWritableBitmap(int* stride) {
-        void* ret = NULL;
-        lockPtr = ::LockWritableBitmap(_xamlImage, &ret, stride);
+        void* ret = nullptr;
+        _lockPtr = ::LockWritableBitmap(_xamlImage, &ret, stride);
         return ret;
     }
 
     void UnlockWritableBitmap() {
-        ::UnlockWritableBitmap(_xamlImage, lockPtr);
-        lockPtr = NULL;
+        // Release our _lockPtr to unlock the bitmap
+        _lockPtr.Reset();
     }
 
-    void SetNodeContent(DisplayNode* node, float width, float height, float scale) {
-        node->SetContents(_xamlImage, width, height, scale);
+    const ComPtr<IInspectable>& GetContent() const {
+        return _xamlImage;
     }
 
-    // Add accessor for private variable so that other classes can access it.
-    Microsoft::WRL::ComPtr<IInspectable> GetXamlImage() {
-        Microsoft::WRL::ComPtr<IUnknown> xamlImage(static_cast<IUnknown*>(_xamlImage));
-        Microsoft::WRL::ComPtr<IInspectable> inspectableNode;
-        xamlImage.As(&inspectableNode);
-        return inspectableNode;
-    }
-};
-
-class DisplayTextureText : public DisplayTextureXamlGlyphs {
-public:
-    void SetParams(UIFont* font,
-                   NSString* text,
-                   UIColor* color,
-                   UITextAlignment alignment,
-                   UILineBreakMode lineBreak,
-                   UIColor* shadowColor,
-                   const CGSize& shadowOffset,
-                   int numLines,
-                   UIEdgeInsets edgeInsets,
-                   bool centerVertically) {
-        switch (alignment) {
-            case UITextAlignmentLeft:
-                _horzAlignment = alignLeft;
-                break;
-
-            case UITextAlignmentCenter:
-                _horzAlignment = alignCenter;
-                break;
-
-            case UITextAlignmentRight:
-                _horzAlignment = alignRight;
-                break;
-        }
-
-        _insets[0] = edgeInsets.left;
-        _insets[1] = edgeInsets.top;
-        _insets[2] = edgeInsets.right;
-        _insets[3] = edgeInsets.bottom;
-
-        if (color) {
-            memcpy(_color, [color _getColors], sizeof(_color));
-        } else {
-            memset(_color, 0, sizeof(_color));
-        }
-
-        _fontSize = [font pointSize];
-        _centerVertically = centerVertically;
-        _lineHeight = [font ascender] - [font descender];
-
-        int mask = [font fontDescriptor].symbolicTraits;
-        _isBold = (mask & UIFontDescriptorTraitBold) > 0;
-        _isItalic = (mask & UIFontDescriptorTraitItalic) > 0;
-        std::wstring wideBuffer = Strings::NarrowToWide<std::wstring>(text);
-        ConstructGlyphs([[font fontName] UTF8String], wideBuffer.c_str(), wideBuffer.length());
-    }
+private:
+    Microsoft::WRL::ComPtr<IInspectable> _lockPtr;
 };
 
 class DisplayAnimationTransition : public DisplayAnimation {
@@ -836,22 +762,6 @@ public:
             AddAnimation(node, L"position.x", _fromValue != nil, fromValue.x, _toValue != nil, toValue.x);
             AddAnimation(node, L"position.y", _fromValue != nil, fromValue.y, _toValue != nil, toValue.y);
             Start();
-        } else if (strcmp(propName, "bounds.size") == 0) {
-            _adjustCGSizeValuesForKeyPath(_propertyName);
-            CGSize fromValue = [(NSValue*)_fromValue CGSizeValue];
-            CGSize toValue = [(NSValue*)_toValue CGSizeValue];
-
-            AddAnimation(node, L"size.width", _fromValue != nil, fromValue.width, _toValue != nil, toValue.width);
-            AddAnimation(node, L"size.height", _fromValue != nil, fromValue.height, _toValue != nil, toValue.height);
-            Start();
-        } else if (strcmp(propName, "bounds.origin") == 0) {
-            _adjustCGPointValuesForKeyPath(_propertyName);
-            CGPoint fromValue = [(NSValue*)_fromValue CGPointValue];
-            CGPoint toValue = [(NSValue*)_toValue CGPointValue];
-
-            AddAnimation(node, L"origin.x", _fromValue != nil, fromValue.x, _toValue != nil, toValue.x);
-            AddAnimation(node, L"origin.y", _fromValue != nil, fromValue.y, _toValue != nil, toValue.y);
-            Start();
         } else if (strcmp(propName, "bounds") == 0) {
             _adjustCGRectValuesForKeyPath(_propertyName);
             CGRect fromValue = [(NSValue*)_fromValue CGRectValue];
@@ -907,8 +817,6 @@ public:
 
             AddAnimation(node, L"transform.translation.x", _fromValue != nil, fromValue, _toValue != nil, toValue);
             Start();
-        } else if (strcmp(propName, "contents") == 0) {
-            UNIMPLEMENTED_WITH_MSG("Contents property not supported");
         } else {
             UNIMPLEMENTED_WITH_MSG("Stubbed function called! Unsupported property name: %hs", propName);
         }
@@ -926,178 +834,161 @@ concurrency::task<void> DisplayNode::AddAnimation(DisplayAnimation* anim) {
     return concurrency::task_from_result();
 }
 
-void DisplayNode::SetContents(DisplayTexture* tex, float width, float height, float contentScale) {
-    currentTexture = tex;
-
-    if (tex) {
-        tex->SetNodeContent(this, width, height, contentScale);
-    } else {
-        winobjc::Id nullContents;
-
-        SetContents(nullContents, width, height, contentScale);
-    }
+void DisplayNode::SetTexture(DisplayTexture* texture, float width, float height, float contentScale) {
+    _currentTexture = texture;
+    SetContents((texture ? texture->GetContent() : nullptr), width, height, contentScale);
 }
 
-class DisplayNodeXaml : public DisplayNode {
-public:
-    void* GetProperty(const char* name) {
-        NSObject* ret = nil;
+void* DisplayNode::GetProperty(const char* name) {
+    NSObject* ret = nil;
 
-        if (strcmp(name, "position") == 0) {
-            CGPoint pos;
+    if (strcmp(name, "position") == 0) {
+        CGPoint pos;
 
-            pos.x = GetPresentationPropertyValue("position.x");
-            pos.y = GetPresentationPropertyValue("position.y");
+        pos.x = _GetPresentationPropertyValue("position.x");
+        pos.y = _GetPresentationPropertyValue("position.y");
 
-            ret = [NSValue valueWithCGPoint:pos];
-        } else if (strcmp(name, "bounds.origin") == 0) {
-            CGPoint pos;
+        ret = [NSValue valueWithCGPoint:pos];
+    } else if (strcmp(name, "bounds.origin") == 0) {
+        CGPoint pos;
 
-            pos.x = GetPresentationPropertyValue("origin.x");
-            pos.y = GetPresentationPropertyValue("origin.y");
+        pos.x = _GetPresentationPropertyValue("origin.x");
+        pos.y = _GetPresentationPropertyValue("origin.y");
 
-            ret = [NSValue valueWithCGPoint:pos];
-        } else if (strcmp(name, "bounds.size") == 0) {
-            CGSize size;
+        ret = [NSValue valueWithCGPoint:pos];
+    } else if (strcmp(name, "bounds.size") == 0) {
+        CGSize size;
 
-            size.width = GetPresentationPropertyValue("size.width");
-            size.height = GetPresentationPropertyValue("size.height");
+        size.width = _GetPresentationPropertyValue("size.width");
+        size.height = _GetPresentationPropertyValue("size.height");
 
-            ret = [NSValue valueWithCGSize:size];
-        } else if (strcmp(name, "bounds") == 0) {
-            CGRect rect;
+        ret = [NSValue valueWithCGSize:size];
+    } else if (strcmp(name, "bounds") == 0) {
+        CGRect rect;
 
-            rect.size.width = GetPresentationPropertyValue("size.width");
-            rect.size.height = GetPresentationPropertyValue("size.height");
-            rect.origin.x = GetPresentationPropertyValue("origin.x");
-            rect.origin.y = GetPresentationPropertyValue("origin.y");
+        rect.size.width = _GetPresentationPropertyValue("size.width");
+        rect.size.height = _GetPresentationPropertyValue("size.height");
+        rect.origin.x = _GetPresentationPropertyValue("origin.x");
+        rect.origin.y = _GetPresentationPropertyValue("origin.y");
 
-            ret = [NSValue valueWithCGRect:rect];
-        } else if (strcmp(name, "opacity") == 0) {
-            float value = GetPresentationPropertyValue("opacity");
+        ret = [NSValue valueWithCGRect:rect];
+    } else if (strcmp(name, "opacity") == 0) {
+        float value = _GetPresentationPropertyValue("opacity");
 
-            ret = [NSNumber numberWithFloat:value];
-        } else if (strcmp(name, "transform") == 0) {
-            float angle = GetPresentationPropertyValue("transform.rotation");
-            float scale[2];
-            float translation[2];
+        ret = [NSNumber numberWithFloat:value];
+    } else if (strcmp(name, "transform") == 0) {
+        float angle = _GetPresentationPropertyValue("transform.rotation");
+        float scale[2];
+        float translation[2];
 
-            scale[0] = GetPresentationPropertyValue("transform.scale.x");
-            scale[1] = GetPresentationPropertyValue("transform.scale.y");
+        scale[0] = _GetPresentationPropertyValue("transform.scale.x");
+        scale[1] = _GetPresentationPropertyValue("transform.scale.y");
 
-            translation[0] = GetPresentationPropertyValue("transform.translation.x");
-            translation[1] = GetPresentationPropertyValue("transform.translation.y");
+        translation[0] = _GetPresentationPropertyValue("transform.translation.x");
+        translation[1] = _GetPresentationPropertyValue("transform.translation.y");
 
-            CATransform3D trans = CATransform3DMakeRotation(-angle * M_PI / 180.0f, 0, 0, 1.0f);
-            trans = CATransform3DScale(trans, scale[0], scale[1], 0.0f);
-            trans = CATransform3DTranslate(trans, translation[0], translation[1], 0.0f);
+        CATransform3D trans = CATransform3DMakeRotation(-angle * M_PI / 180.0f, 0, 0, 1.0f);
+        trans = CATransform3DScale(trans, scale[0], scale[1], 0.0f);
+        trans = CATransform3DTranslate(trans, translation[0], translation[1], 0.0f);
 
-            ret = [NSValue valueWithCATransform3D:trans];
-        } else {
-            FAIL_FAST_HR(E_NOTIMPL);
-        }
-
-        return ret;
+        ret = [NSValue valueWithCATransform3D:trans];
+    } else {
+        FAIL_FAST_HR(E_NOTIMPL);
     }
 
-    void UpdateProperty(const char* name, void* value) {
-        NSObject* newValue = (NSObject*)value;
-        if (name == NULL)
-            return;
-        if ([NSThread currentThread] != [NSThread mainThread]) {
-            return;
-        }
+    return ret;
+}
 
-        if (strcmp(name, "contentsCenter") == 0) {
-            CGRect value = [(NSValue*)newValue CGRectValue];
-            SetContentsCenter(value.origin.x, value.origin.y, value.size.width, value.size.height);
-        } else if (strcmp(name, "anchorPoint") == 0) {
-            CGPoint value = [(NSValue*)newValue CGPointValue];
-            SetProperty(L"anchorPoint.x", value.x);
-            SetProperty(L"anchorPoint.y", value.y);
-        } else if (strcmp(name, "position") == 0) {
-            CGPoint position = [(NSValue*)newValue CGPointValue];
-            SetProperty(L"position.x", position.x);
-            SetProperty(L"position.y", position.y);
-        } else if (strcmp(name, "bounds.origin") == 0) {
-            CGPoint value = [(NSValue*)newValue CGPointValue];
-            SetProperty(L"origin.x", value.x);
-            SetProperty(L"origin.y", value.y);
-        } else if (strcmp(name, "bounds.size") == 0) {
-            CGSize size = [(NSValue*)newValue CGSizeValue];
-            SetProperty(L"size.width", size.width);
-            SetProperty(L"size.height", size.height);
-        } else if (strcmp(name, "opacity") == 0) {
-            float value = [(NSNumber*)newValue floatValue];
-            SetProperty(L"opacity", value);
-        } else if (strcmp(name, "hidden") == 0) {
+void DisplayNode::UpdateProperty(const char* name, void* value) {
+    NSObject* newValue = (NSObject*)value;
+    if (name == NULL)
+        return;
+    if ([NSThread currentThread] != [NSThread mainThread]) {
+        return;
+    }
+
+    if (strcmp(name, "contentsCenter") == 0) {
+        CGRect value = [(NSValue*)newValue CGRectValue];
+        SetContentsCenter(value.origin.x, value.origin.y, value.size.width, value.size.height);
+    } else if (strcmp(name, "anchorPoint") == 0) {
+        CGPoint value = [(NSValue*)newValue CGPointValue];
+        SetProperty(L"anchorPoint.x", value.x);
+        SetProperty(L"anchorPoint.y", value.y);
+    } else if (strcmp(name, "position") == 0) {
+        CGPoint position = [(NSValue*)newValue CGPointValue];
+        SetProperty(L"position.x", position.x);
+        SetProperty(L"position.y", position.y);
+    } else if (strcmp(name, "bounds.origin") == 0) {
+        CGPoint value = [(NSValue*)newValue CGPointValue];
+        SetProperty(L"origin.x", value.x);
+        SetProperty(L"origin.y", value.y);
+    } else if (strcmp(name, "bounds.size") == 0) {
+        CGSize size = [(NSValue*)newValue CGSizeValue];
+        SetProperty(L"size.width", size.width);
+        SetProperty(L"size.height", size.height);
+    } else if (strcmp(name, "opacity") == 0) {
+        float value = [(NSNumber*)newValue floatValue];
+        SetProperty(L"opacity", value);
+    } else if (strcmp(name, "hidden") == 0) {
+        bool value = [(NSNumber*)newValue boolValue];
+        SetHidden(value);
+    } else if (strcmp(name, "masksToBounds") == 0) {
+        if (!_isRoot) {
             bool value = [(NSNumber*)newValue boolValue];
-            SetHidden(value);
-        } else if (strcmp(name, "masksToBounds") == 0) {
-            if (!isRoot) {
-                bool value = [(NSNumber*)newValue boolValue];
-                SetMasksToBounds(value);
-            } else {
-                SetMasksToBounds(true);
-            }
-        } else if (strcmp(name, "transform") == 0) {
-            CATransform3D value = [(NSValue*)newValue CATransform3DValue];
-            float translation[3] = { 0 };
-            float scale[3] = { 0 };
-
-            Quaternion qFrom;
-            qFrom.CreateFromMatrix((float*)&(value));
-
-            CATransform3DGetScale(value, scale);
-            CATransform3DGetPosition(value, translation);
-
-            SetProperty(L"transform.rotation", (float)-qFrom.roll() * 180.0f / M_PI);
-            SetProperty(L"transform.scale.x", scale[0]);
-            SetProperty(L"transform.scale.y", scale[1]);
-            SetProperty(L"transform.translation.x", translation[0]);
-            SetProperty(L"transform.translation.y", translation[1]);
-        } else if (strcmp(name, "contentsScale") == 0) {
-            //  [TODO: Update contents scale in Xaml node]
-            // contentScale = [(NSNumber *) newValue floatValue];
-            UNIMPLEMENTED_WITH_MSG("contentsScale not implemented");
-        } else if (strcmp(name, "contentsOrientation") == 0) {
-            int position = [(NSNumber*)newValue intValue];
-            float toPosition = 0;
-            if (position == UIImageOrientationUp) {
-                toPosition = 0;
-            } else if (position == UIImageOrientationDown) {
-                toPosition = 180;
-            } else if (position == UIImageOrientationLeft) {
-                toPosition = 270;
-            } else if (position == UIImageOrientationRight) {
-                toPosition = 90;
-            }
-            SetProperty(L"transform.rotation", toPosition);
-        } else if (strcmp(name, "zIndex") == 0) {
-            int value = [(NSNumber*)newValue intValue];
-            SetNodeZIndex(value);
-        } else if (strcmp(name, "contentsSize") == 0) {
-            UNIMPLEMENTED_WITH_MSG("contentsSize not implemented");
-        } else if (strcmp(name, "gravity") == 0) {
-            SetPropertyInt(L"gravity", [(NSNumber*)newValue intValue]);
-        } else if (strcmp(name, "zPosition") == 0) {
-            UNIMPLEMENTED_WITH_MSG("zPosition not implemented");
-        } else if (strcmp(name, "contentColor") == 0) {
-            UNIMPLEMENTED_WITH_MSG("contentColor not implemented");
-        } else if (strcmp(name, "sublayerTransform") == 0) {
-            UNIMPLEMENTED_WITH_MSG("sublayerTransform not implemented");
-        } else if (strcmp(name, "backgroundColor") == 0) {
-            const __CGColorQuad* color = [(UIColor*)newValue _getColors];
-            if (color) {
-                SetBackgroundColor(color->r, color->g, color->b, color->a);
-            } else {
-                SetBackgroundColor(0.0f, 0.0f, 0.0f, 0.0f);
-            }
+            SetMasksToBounds(value);
         } else {
-            FAIL_FAST_HR(E_NOTIMPL);
+            SetMasksToBounds(true);
         }
+    } else if (strcmp(name, "transform") == 0) {
+        CATransform3D value = [(NSValue*)newValue CATransform3DValue];
+        float translation[3] = { 0 };
+        float scale[3] = { 0 };
+
+        Quaternion qFrom;
+        qFrom.CreateFromMatrix((float*)&(value));
+
+        CATransform3DGetScale(value, scale);
+        CATransform3DGetPosition(value, translation);
+
+        SetProperty(L"transform.rotation", (float)-qFrom.roll() * 180.0f / M_PI);
+        SetProperty(L"transform.scale.x", scale[0]);
+        SetProperty(L"transform.scale.y", scale[1]);
+        SetProperty(L"transform.translation.x", translation[0]);
+        SetProperty(L"transform.translation.y", translation[1]);
+    } else if (strcmp(name, "contentsScale") == 0) {
+        UNIMPLEMENTED_WITH_MSG("contentsScale not implemented");
+    } else if (strcmp(name, "contentsOrientation") == 0) {
+        int position = [(NSNumber*)newValue intValue];
+        float toPosition = 0;
+        if (position == UIImageOrientationUp) {
+            toPosition = 0;
+        } else if (position == UIImageOrientationDown) {
+            toPosition = 180;
+        } else if (position == UIImageOrientationLeft) {
+            toPosition = 270;
+        } else if (position == UIImageOrientationRight) {
+            toPosition = 90;
+        }
+        SetProperty(L"transform.rotation", toPosition);
+    } else if (strcmp(name, "zIndex") == 0) {
+        ///////////////////////////////////////////////////////////////////////////////////////
+        // TODO: This should just happen in UIWindow.mm and should get deleted from here
+        int value = [(NSNumber*)newValue intValue];
+        SetNodeZIndex(value);
+        ///////////////////////////////////////////////////////////////////////////////////////
+    } else if (strcmp(name, "gravity") == 0) {
+        SetPropertyInt(L"gravity", [(NSNumber*)newValue intValue]);
+    } else if (strcmp(name, "backgroundColor") == 0) {
+        const __CGColorQuad* color = [(UIColor*)newValue _getColors];
+        if (color) {
+            SetBackgroundColor(color->r, color->g, color->b, color->a);
+        } else {
+            SetBackgroundColor(0.0f, 0.0f, 0.0f, 0.0f);
+        }
+    } else {
+        FAIL_FAST_HR(E_NOTIMPL);
     }
-};
+}
 
 class QueuedAnimation : public ICompositorAnimationTransaction {
 public:
@@ -1189,7 +1080,7 @@ public:
 
     void Process() override {
         if (_applyingTexture) {
-            _node->SetContents(_newTexture.Get(), _contentsSize.width, _contentsSize.height, _contentsScale);
+            _node->SetTexture(_newTexture.Get(), _contentsSize.width, _contentsSize.height, _contentsScale);
         } else {
             _node->UpdateProperty(_propertyName, _propertyValue);
         }
@@ -1283,18 +1174,17 @@ deque<std::shared_ptr<DisplayTransaction>> s_queuedTransactions;
 
 class CAXamlCompositor : public CACompositorInterface {
 public:
-    virtual DisplayNode* CreateDisplayNode() override {
-        DisplayNode* ret = new DisplayNodeXaml();
-        return ret;
+    virtual DisplayNode* CreateDisplayNode(const ComPtr<IInspectable>& xamlElement) override {
+        return new DisplayNode(xamlElement.Get());
     }
 
-    virtual Microsoft::WRL::ComPtr<IInspectable> GetXamlLayoutElement(DisplayNode* displayNode) override {
-        Microsoft::WRL::ComPtr<IUnknown> xamlNode(static_cast<IUnknown*>(displayNode->_layoutElement));
-        Microsoft::WRL::ComPtr<IInspectable> inspectableNode;
-        xamlNode.As(&inspectableNode);
-        return inspectableNode;
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // TODO: WE SHOULDN'T NEED THIS ANYMORE, BUT IF WE DO, MOVE IT TO DISPLAYNODE AND JUST CALL IT GETXAMLELEMENT
+    virtual ComPtr<IInspectable> GetXamlLayoutElement(DisplayNode* displayNode) override {
+        return displayNode->_xamlElement;
     }
-
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
     std::shared_ptr<DisplayTransaction> CreateDisplayTransaction() override {
         return std::make_shared<DisplayTransaction>();
     }
@@ -1341,12 +1231,6 @@ public:
         transaction->QueueProperty(std::make_shared<QueuedProperty>(node, newTexture, contentsSize, contentsScale));
     }
 
-    virtual void setNodeMaskNode(DisplayNode* node, DisplayNode* maskNode) override {
-    }
-
-    virtual void setNewPatternBackground(id layer) {
-    }
-
     virtual void setDisplayProperty(const std::shared_ptr<DisplayTransaction>& transaction,
                                     DisplayNode* node,
                                     const char* propertyName,
@@ -1356,9 +1240,6 @@ public:
 
     virtual void setNodeTopMost(DisplayNode* node, bool topMost) override {
         node->SetTopMost();
-    }
-
-    virtual void setNodeTopWindowLevel(DisplayNode* node, float level) override {
     }
 
     virtual DisplayTexture* GetDisplayTextureForCGImage(CGImageRef img, bool create) override {
@@ -1381,11 +1262,9 @@ public:
         return ret;
     }
 
-    virtual Microsoft::WRL::ComPtr<IInspectable> GetBitmapForCGImage(CGImageRef img) override {
-        DisplayTextureContent* content = new DisplayTextureContent(img);
-        Microsoft::WRL::ComPtr<IInspectable> inspectableNode(content->GetXamlImage());
-        delete content;
-        return inspectableNode;
+    virtual ComPtr<IInspectable> GetBitmapForCGImage(CGImageRef img) override {
+        auto content = std::make_unique<DisplayTextureContent>(img);
+        return content->GetContent();
     }
 
     DisplayTexture* CreateWritableBitmapTexture32(int width, int height) override {
@@ -1401,29 +1280,6 @@ public:
         ((DisplayTextureContent*)tex)->UnlockWritableBitmap();
     }
 
-    virtual DisplayTexture* CreateDisplayTextureForText() override {
-        DisplayTextureText* texRet = new DisplayTextureText();
-        return texRet;
-    }
-
-    virtual void SetTextDisplayTextureParams(DisplayTexture* texture,
-                                             id font,
-                                             id text,
-                                             id color,
-                                             UITextAlignment alignment,
-                                             UILineBreakMode lineBreak,
-                                             id shadowColor,
-                                             const CGSize& shadowOffset,
-                                             int numLines,
-                                             UIEdgeInsets edgeInsets,
-                                             bool centerVertically) override {
-        if (!texture)
-            return;
-
-        ((DisplayTextureText*)texture)
-            ->SetParams(font, text, color, alignment, lineBreak, shadowColor, shadowOffset, numLines, edgeInsets, centerVertically);
-    }
-
     virtual DisplayAnimation* GetBasicDisplayAnimation(id animobj,
                                                        NSString* propertyName,
                                                        NSObject* fromValue,
@@ -1434,7 +1290,7 @@ public:
         return basicAnim;
     }
 
-    virtual DisplayAnimation* GetMoveDisplayAnimation(DisplayAnimation** secondAnimRet,
+    virtual DisplayAnimation* GetMoveDisplayAnimation(DisplayAnimation** secondAnimRet, // <--------------- WHAAAAT???
                                                       id animobj,
                                                       DisplayNode* animNode,
                                                       NSString* typeStr,
@@ -1444,18 +1300,9 @@ public:
         return transitionAnim;
     }
 
-    virtual void RetainAnimation(DisplayAnimation* animation) override {
-        if (animation)
-            animation->AddRef();
-    }
-
     virtual void ReleaseAnimation(DisplayAnimation* animation) override {
         if (animation)
             animation->Release();
-    }
-
-    virtual void RetainNode(DisplayNode* node) override {
-        node->AddRef();
     }
 
     virtual void ReleaseNode(DisplayNode* node) override {
@@ -1565,10 +1412,6 @@ public:
         s_queuedTransactions.clear();
     }
 
-    virtual void RequestRedraw() override {
-        CASignalDisplayLink();
-    }
-
     virtual void setScreenSize(float width, float height, float scale, float rotation) override {
         ::screenWidth = width;
         ::screenHeight = height;
@@ -1602,11 +1445,6 @@ public:
         return (NSObject*)node->GetProperty(propertyName);
     }
 
-    DisplayTexture* CreateDisplayTextureForElement(id xamlElement) override {
-        GenericControlXaml* genericControlTexture = new GenericControlXaml([xamlElement comObj].Get());
-        return genericControlTexture;
-    }
-
     virtual void SetShouldRasterize(DisplayNode* node, bool rasterize) override {
         node->SetShouldRasterize(rasterize);
     }
@@ -1621,7 +1459,6 @@ void CreateXamlCompositor(winobjc::Id& root, CompositionMode compositionMode) {
     CGImageAddDestructionListener(UIReleaseDisplayTextureForCGImage);
     static CAXamlCompositor* compIntr = new CAXamlCompositor();
     SetCACompositor(compIntr);
-    EbrGetMediaTime();
     SetRootGrid(root);
 }
 

@@ -110,6 +110,8 @@ __declspec(thread) CATransaction* _curTransaction, *_rootTransaction;
         [_rootTransaction release];
         _rootTransaction = NULL;
     }
+
+    // GetCACompositor()->ProcessTransactions();??
 }
 
 /**

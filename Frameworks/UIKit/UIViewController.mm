@@ -1782,18 +1782,17 @@ static UIInterfaceOrientation findOrientation(UIViewController* self) {
         frame = [self _modalPresentationFormSheetFrame];
     }
 
-    // Create a template UIView
-    UIView* view = [[[UIEmptyView alloc] initWithFrame:frame] autorelease];
-    [view setAutoresizingMask:UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth];
-    [self setView:view];
-
     // Activate an instance of the XAML class and its page
     Microsoft::WRL::ComPtr<IInspectable> pageObj = nullptr;
     auto xamlType = ReturnXamlType(priv->_xamlClassName);
     xamlType->ActivateInstance(pageObj.GetAddressOf());
+    [_pageMappings setObject:self forKey:(id)(void *)pageObj.Get()];
 
-    priv->_page = XamlControls::_createRtProxy([WXCPage class], pageObj.Get());
-    [_pageMappings setObject:self forKey:(id)(void*)pageObj.Get()];
+    // Create a template UIView
+    priv->_page = CreateRtProxy([WXCPage class], pageObj.Get());
+    UIView* view = [[[UIEmptyView alloc] initWithFrame:frame xamlElement:priv->_page] autorelease];
+    [view setAutoresizingMask:UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth];
+    [self setView:view];
 
     // Walk the list of outlets and assign them to the corresponding XAML UIElement
     unsigned int propListCount = 0;
@@ -1812,8 +1811,6 @@ static UIInterfaceOrientation findOrientation(UIViewController* self) {
             }
         }
     }
-
-    [self.view setXamlElement:priv->_page];
 }
 
 /**

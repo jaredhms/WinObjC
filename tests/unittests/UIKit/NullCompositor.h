@@ -21,9 +21,7 @@ class NullCompositor : public CACompositorInterface {
 public:
     void ProcessTransactions() override {
     }
-    void RequestRedraw() override {
-    }
-    DisplayNode* CreateDisplayNode() override {
+    DisplayNode* CreateDisplayNode(const Microsoft::WRL::ComPtr<IInspectable>& xamlElement) override {
         return nullptr;
     }
     Microsoft::WRL::ComPtr<IInspectable> GetXamlLayoutElement(DisplayNode*) override {
@@ -65,15 +63,12 @@ public:
                         CGSize contentsSize,
                         float contentsScale) override {
     }
-    void setNodeMaskNode(DisplayNode* node, DisplayNode* maskNode) override {
-    }
+
     NSObject* getDisplayProperty(DisplayNode* node, const char* propertyName = NULL) override {
         return nil;
     }
 
     void setNodeTopMost(DisplayNode* node, bool topMost) override {
-    }
-    void setNodeTopWindowLevel(DisplayNode* node, float level) override {
     }
 
     DisplayTexture* GetDisplayTextureForCGImage(CGImageRef img, bool create) override {
@@ -81,25 +76,6 @@ public:
     }
 
     Microsoft::WRL::ComPtr<IInspectable> GetBitmapForCGImage(CGImageRef img) override {
-        return nullptr;
-    }
-
-    DisplayTexture* CreateDisplayTextureForText() override {
-        return nullptr;
-    }
-    void SetTextDisplayTextureParams(DisplayTexture* texture,
-                                     id font,
-                                     id text,
-                                     id color,
-                                     UITextAlignment alignment,
-                                     UILineBreakMode lineBreak,
-                                     id shadowColor,
-                                     const CGSize& shadowOffset,
-                                     int numLines,
-                                     UIEdgeInsets edgeInsets,
-                                     bool centerVertically) override {
-    }
-    DisplayTexture* CreateDisplayTextureForElement(id xamlElement) override {
         return nullptr;
     }
 
@@ -120,13 +96,9 @@ public:
         return nullptr;
     }
 
-    void RetainAnimation(DisplayAnimation* animation) override {
-    }
     void ReleaseAnimation(DisplayAnimation* animation) override {
     }
 
-    void RetainNode(DisplayNode* node) override {
-    }
     void ReleaseNode(DisplayNode* node) override {
     }
 

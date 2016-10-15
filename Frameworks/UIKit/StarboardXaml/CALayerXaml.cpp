@@ -27,6 +27,7 @@
 using namespace concurrency;
 using namespace Platform;
 using namespace Strings::Private;
+using namespace UIKit::Private::CoreAnimation;
 using namespace Windows::System::Threading;
 using namespace Windows::Foundation;
 using namespace Windows::UI;
@@ -44,1478 +45,18 @@ using namespace Windows::UI::Xaml::Media::Imaging;
 using namespace Windows::UI::Xaml::Shapes;
 using namespace Windows::Graphics::Display;
 
-static const wchar_t* TAG = L"CALayerXaml";
+static const wchar_t* TAG = L"!!!!TODO SPLIT OUT AND GIVE PROPER NAMES!!!!";
 
-namespace XamlCompositor {
-namespace Controls {
-//
-// ObjectCache
-//
-ICacheableObject^ ObjectCache::GetCachableObject() {
-    if (m_objects.size() == 0) {
-        return nullptr;
-    }
+static const bool DEBUG_ALL = true;
+static const bool DEBUG_POSITION = DEBUG_ALL || false;
+static const bool DEBUG_ANCHORPOINT = DEBUG_ALL || false;
+static const bool DEBUG_SIZE = DEBUG_ALL || false;
 
-    ICacheableObject^ object = m_objects.front();
-    m_objects.pop();
-    return object;
-};
+namespace CoreAnimation {
 
-void ObjectCache::PushCacheableObject(ICacheableObject^ obj) {
-    obj->Reset();
-    if (m_objects.size() >= m_maxSize) {
-        return;
-    }
-    m_objects.push(obj);
-};
-
-//
-// LayerContent
-//
-LayerContent::LayerContent() {
-    Name = L"LayerContent"; // Set a name so we can be seen in the live tree viewer
-    IsHitTestVisible = true; // Always be hit testable by default.
-    m_gravity = ContentGravity::Resize;
-    m_scaleFactor = 1.0f;
-}
-
-void LayerContent::Reset() {
-    Children->Clear();
-    m_image = nullptr;
-    m_content = nullptr;
-    m_imageSize = Size(0, 0);
-    m_contentSize = Size(0, 0);
-    m_contentsCenter = Rect(0, 0, 1.0, 1.0);
-    m_gravity = ContentGravity::Resize;
-    m_scaleFactor = 1.0f;
-    m_origin = Point();
-}
-
-LayerContent^ LayerContent::CreateLayerContent() {
-    ICacheableObject^ ret = _LayerContentCache->GetCachableObject();
-    if (ret != nullptr) {
-        return (LayerContent^)ret;
-    }
-
-    return ref new LayerContent();
-}
-
-void LayerContent::DestroyLayerContent(LayerContent^ content) {
-    _LayerContentCache->PushCacheableObject(content);
-}
-
-int LayerContent::_IfNegativeMakeZero(int value) {
-    return (value < 0) ? 0 : value;
-}
-
-void LayerContent::_ApplyContentsCenter() {
-    if (m_image == nullptr) {
-        return;
-    }
-    if (m_image->Source == nullptr) {
-        return;
-    }
-
-    if (m_contentsCenter.X == 0.0 &&
-        m_contentsCenter.Y == 0.0 &&
-        m_contentsCenter.Width == 1.0 &&
-        m_contentsCenter.Height == 1.0) {
-        m_image->NineGrid = Thickness(0, 0, 0, 0);
-    } else {
-        int left = (int)(m_contentsCenter.X * m_imageSize.Width);
-        int top = (int)(m_contentsCenter.Y * m_imageSize.Height);
-        int right = ((int)m_imageSize.Width) - (left + ((int)(m_contentsCenter.Width * m_imageSize.Width)));
-        int bottom = ((int)m_imageSize.Height) - (top + ((int)(m_contentsCenter.Height * m_imageSize.Height)));
-
-        // Remove edge cases that contentsCenter supports but NineGrid does not. 1/3 for top 1/3 for bottom 1/3 for
-        // the center etc..
-
-        left = _IfNegativeMakeZero(left);
-        top = _IfNegativeMakeZero(top);
-        right = _IfNegativeMakeZero(right);
-        bottom = _IfNegativeMakeZero(bottom);
-
-        int maxWidth = (int)m_imageSize.Width / 3;
-
-        if (left >= maxWidth) {
-            left = maxWidth;
-        }
-
-        if (right >= maxWidth) {
-            right = maxWidth;
-        }
-
-        int maxHeight = (int)m_imageSize.Height / 3;
-
-        if (top >= maxHeight) {
-            top = maxHeight;
-        }
-
-        if (bottom >= maxHeight) {
-            bottom = maxHeight;
-        }
-
-        m_image->NineGrid = Thickness(left, top, right, bottom);
-    }
-}
-
-Rect LayerContent::_GetContentGravityRect(Size size) {
-    float left = 0;
-    float top = 0;
-    float width = 0;
-    float height = 0;
-
-    double widthAspect = size.Width / m_contentSize.Width;
-    double heightAspect = size.Height / m_contentSize.Height;
-    double minAspect = std::min<double>(widthAspect, heightAspect);
-    double maxAspect = std::max<double>(widthAspect, heightAspect);
-
-    //  Top/bottom switched due to geometric origin
-    switch (m_gravity) {
-        case ContentGravity::Center:
-            left = (size.Width / 2) - (m_contentSize.Width / 2);
-            top = (size.Height / 2) - (m_contentSize.Height / 2);
-            width = m_contentSize.Width;
-            height = m_contentSize.Height;
-            if (m_image != nullptr)
-            {
-                m_image->Stretch = Stretch::Fill;
-            }
-            break;
-
-        case ContentGravity::Top:
-            left = (size.Width / 2) - (m_contentSize.Width / 2);
-            top = size.Height - m_contentSize.Height;
-            width = m_contentSize.Width;
-            height = m_contentSize.Height;
-            if (m_image != nullptr)
-            {
-                m_image->Stretch = Stretch::Fill;
-            }
-            break;
-
-        case ContentGravity::Bottom:
-            left = (size.Width / 2) - (m_contentSize.Width / 2);
-            top = 0;
-            width = m_contentSize.Width;
-            height = m_contentSize.Height;
-            if (m_image != nullptr)
-            {
-                m_image->Stretch = Stretch::Fill;
-            }
-            break;
-
-        case ContentGravity::Left:
-            left = 0;
-            top = (size.Height / 2) - (m_contentSize.Height / 2);
-            width = m_contentSize.Width;
-            height = m_contentSize.Height;
-            if (m_image != nullptr)
-            {
-                m_image->Stretch = Stretch::Fill;
-            }
-            break;
-
-        case ContentGravity::Right:
-            left = size.Width - m_contentSize.Width;
-            top = (size.Height / 2) - (m_contentSize.Height / 2);
-            width = m_contentSize.Width;
-            height = m_contentSize.Height;
-            if (m_image != nullptr)
-            {
-                m_image->Stretch = Stretch::Fill;
-            }
-            break;
-
-        case ContentGravity::TopLeft:
-            left = 0;
-            top = size.Height - m_contentSize.Height;
-            width = m_contentSize.Width;
-            height = m_contentSize.Height;
-            if (m_image != nullptr)
-            {
-                m_image->Stretch = Stretch::Fill;
-            }
-            break;
-
-        case ContentGravity::TopRight:
-            left = size.Width - m_contentSize.Width;
-            top = size.Height - m_contentSize.Height;
-            width = m_contentSize.Width;
-            height = m_contentSize.Height;
-            if (m_image != nullptr)
-            {
-                m_image->Stretch = Stretch::Fill;
-            }
-            break;
-
-        case ContentGravity::BottomLeft:
-            left = 0;
-            top = 0;
-            width = m_contentSize.Width;
-            height = m_contentSize.Height;
-            if (m_image != nullptr)
-            {
-                m_image->Stretch = Stretch::Fill;
-            }
-            break;
-
-        case ContentGravity::BottomRight:
-            left = size.Width - m_contentSize.Width;
-            top = 0;
-            width = m_contentSize.Width;
-            height = m_contentSize.Height;
-            if (m_image != nullptr)
-            {
-                m_image->Stretch = Stretch::Fill;
-            }
-            break;
-
-        case ContentGravity::Resize:
-            // UIViewContentModeScaleToFil;
-            left = 0;
-            top = 0;
-            width = size.Width;
-            height = size.Height;
-            if (m_image != nullptr)
-            {
-                m_image->Stretch = Stretch::Fill;
-            }
-            break;
-
-        case ContentGravity::ResizeAspect:
-            // UIViewContentModeScaleAspectFit
-
-            // Scale the image with the smaller aspect.
-            width = m_contentSize.Width * (float)minAspect;
-            height = m_contentSize.Height * (float)minAspect;
-
-            left = (size.Width / 2) - (width / 2);
-            top = (size.Height / 2) - (height / 2);
-            if (m_image != nullptr) {
-                // Using Fill since we calculate the aspect ourselves because image translates when modifying its scale with Stretch::Uniform.
-                m_image->Stretch = Stretch::Fill;
-            }
-            break;
-
-        case ContentGravity::ResizeAspectFill:
-            // UIViewContentModeScaleAspectFill
-
-            // Scale the image with the larger aspect.
-            width = m_contentSize.Width * (float)maxAspect;
-            height = m_contentSize.Height * (float)maxAspect;
-
-            left = (size.Width / 2) - (width / 2);
-            top = (size.Height / 2) - (height / 2);
-            if (m_image != nullptr)
-            {
-                // Using Fill since we calculate the aspect ourselves because XAML clips when setting UniformToFill.
-                m_image->Stretch = Stretch::Fill;
-            }
-            break;
-    }
-
-    return Rect(left, top, width, height);
-}
-
-Image^ LayerContent::_GetImage() {
-    if (m_image == nullptr) {
-        m_image = ref new Image();
-        m_image->Stretch = Stretch::Fill;
-        m_scaleFactor = 1.0f;
-    }
-
-    SetElementContent(m_image);
-    return m_image;
-}
-
-void LayerContent::SetContentsCenter(Rect rect) {
-    m_contentsCenter = rect;
-    _ApplyContentsCenter();
-}
-
-void LayerContent::SetGravity(ContentGravity imgGravity) {
-    m_gravity = imgGravity;
-    InvalidateArrange();
-}
-
-void LayerContent::SetImageContent(ImageSource^ source, float width, float height) {
-    if (source == nullptr) {
-        SetElementContent(nullptr);
-        return;
-    }
-
-    Image^ imgContents = _GetImage();
-    imgContents->IsHitTestVisible = false; // Our content should never be HitTestVisible as they are always leaf nodes.
-
-    if (Util::isInstanceOf<BitmapSource^>(source)) {
-        m_imageSize = Size(width, height);
-    } else {
-        m_imageSize = Size(0, 0);
-    }
-    imgContents->Source = source;
-
-    _ApplyContentsCenter();
-}
-
-void LayerContent::_AdjustContentOriginX(Storyboard^ storyboard, DoubleAnimation^ properties, Object^ fromValue, Object^ toValue) {
-    if (toValue != nullptr) {
-        double value = -((double)toValue);
-        m_origin.X = (float)value;
-    }
-    if (m_image != nullptr || m_content == nullptr) {
-        return;
-    }
-    InvalidateArrange();
-}
-
-void LayerContent::_AdjustContentOriginY(Storyboard^ storyboard, DoubleAnimation^ properties, Object^ fromValue, Object^ toValue) {
-    if (toValue != nullptr) {
-        double value = -((double)toValue);
-        m_origin.Y = (float)value;
-    }
-    if (m_image != nullptr || m_content == nullptr) {
-        return;
-    }
-    InvalidateArrange();
-}
-
-void LayerContent::SetElementContent(FrameworkElement^ source) {
-    if (m_content == source) {
-        return;
-    }
-
-    if (m_content != nullptr) {
-        unsigned int index;
-        if (Children->IndexOf(m_content, &index)) {
-            Children->RemoveAt(index);
-        }
-        m_content = nullptr;
-        m_image = nullptr;
-    }
-
-    if (source != nullptr) {
-        m_content = source;
-        Children->Append(m_content);
-        InvalidateArrange();
-
-        m_imageSize = Size(0, 0);
-    }
-}
-
-void LayerContent::SetContentParams(float width, float height, float scale) {
-    Size oldSize = m_contentSize;
-    float oldScale = scale;
-
-    m_contentSize = Size(width / scale, height / scale);
-
-    if (m_scaleFactor <= 0.0f) {
-        m_scaleFactor = 1.0f;
-    }
-
-    if (m_scaleFactor != scale) {
-        m_scaleFactor = scale;
-
-        if (m_image != nullptr) {
-            if (m_scaleFactor != 1.0f) {
-                ScaleTransform^ trans = ref new ScaleTransform();
-                trans->ScaleX = 1.0 / m_scaleFactor;
-                trans->ScaleY = 1.0 / m_scaleFactor;
-                m_image->RenderTransform = trans;
-            } else {
-                m_image->RenderTransform = nullptr;
-            }
-        }
-    }
-
-    if (oldScale != m_scaleFactor || oldSize != m_contentSize) {
-        InvalidateArrange();
-    }
-}
-
-Size LayerContent::ArrangeOverride(Size finalSize) {
-    if (m_content != nullptr) {
-        Rect newSize = _GetContentGravityRect(finalSize);
-
-        if (m_image != nullptr) {
-            m_content->Width = newSize.Width * m_scaleFactor;
-            m_content->Height = newSize.Height * m_scaleFactor;
-        } else {
-            double contentWidth = newSize.Width - m_origin.X;
-            double contentHeight = newSize.Height - m_origin.Y;
-            if (contentWidth < 0.0) {
-                contentWidth = 0.0;
-            }
-            if (contentHeight < 0.0) {
-                contentHeight = 0.0;
-            }
-
-            m_content->Width = contentWidth;
-            m_content->Height = contentHeight;
-        }
-
-        m_content->Arrange(
-            Rect(newSize.Left + m_origin.X, newSize.Top + m_origin.Y, (float)m_content->Width, (float)m_content->Height));
-    }
-
-    return finalSize;
-}
-
-Size LayerContent::MeasureOverride(Size availableSize) {
-    return availableSize;
-}
-
-//
-// CALayerXaml
-//
-double CALayerXaml::s_screenScale = 1.0;
-DependencyProperty^ CALayerXaml::s_visualWidthProperty = nullptr;
-DependencyProperty^ CALayerXaml::s_visualHeightProperty = nullptr;
-std::map<String^, CALayerXaml::AnimatableProperty^> CALayerXaml::s_animatableProperties = {
-    { "position.x",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  CALayerXaml::_AddAnimation("(UIElement.RenderTransform).(TransformGroup.Children)[3].(TranslateTransform.X)",
-                                             (UIElement^)target,
-                                             storyboard,
-                                             properties,
-                                             from,
-                                             to);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              double positionX = (double)toValue;
-              target->m_position.X = (float)positionX;
-              if (target->m_createdTransforms) {
-                  ((TranslateTransform^)((TransformGroup^)target->RenderTransform)->Children->GetAt(3))->X = (double)toValue;
-              } else {
-                  target->_CalcTransforms();
-              }
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    if (!target->m_createdTransforms) {
-                                                            return (double)target->m_position.X;
-                                                    }
-                                                    return CALayerXaml::_GetAnimatedTransformIndex(
-                                                        target, 3, TranslateTransform::XProperty);
-                                               })) },
-    { "position.y",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  CALayerXaml::_AddAnimation("(UIElement.RenderTransform).(TransformGroup.Children)[3].(TranslateTransform.Y)",
-                                             target,
-                                             storyboard,
-                                             properties,
-                                             from,
-                                             to);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              double positionY = (double)toValue;
-              target->m_position.Y = (float)positionY;
-              if (target->m_createdTransforms) {
-                  ((TranslateTransform^)((TransformGroup^)target->RenderTransform)->Children->GetAt(3))->Y = (double)toValue;
-              } else {
-                  target->_CalcTransforms();
-              }
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    if (!target->m_createdTransforms) {
-                                                          return (double)target->m_position.Y;
-                                                    }
-                                                    return CALayerXaml::_GetAnimatedTransformIndex(
-                                                        target, 3, TranslateTransform::YProperty);
-                                                })) },
-    { "position",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  s_animatableProperties["position.x"]->Animate(target,
-                                                                storyboard,
-                                                                properties,
-                                                                from != nullptr ? (Object^)((Point)from).X : nullptr,
-                                                                (double)((Point)to).X);
-                  s_animatableProperties["position.y"]->Animate(target,
-                                                                storyboard,
-                                                                properties,
-                                                                from != nullptr ? (Object^)((Point)from).Y : nullptr,
-                                                                (double)((Point)to).Y);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              s_animatableProperties["position.x"]->Set(target, (double)((Point)toValue).X);
-              s_animatableProperties["position.y"]->Set(target, (double)((Point)toValue).Y);
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    // Unbox x and y values as doubles, before casting them to floats
-                                                    return Point((float)(double)target->Get("position.x"),
-                                                                 (float)(double)target->Get("position.y"));
-                                               })) },
-    { "origin.x",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  target->SetupBackground();
-                  double targetFrom = from != nullptr ? (double)from : 0.0;
-                  double targetTo = to != nullptr ? (double)to : 0.0;
-
-                  CALayerXaml::_AddAnimation("(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)",
-                                             target,
-                                             storyboard,
-                                             properties,
-                                             (from != nullptr) ? (Object^)(-targetFrom) : nullptr,
-                                             -targetTo);
-                  if (target->m_masksToBounds) {
-                      CALayerXaml::_AddAnimation("(UIElement.Clip).(Transform).(TranslateTransform.X)",
-                                                 target,
-                                                 storyboard,
-                                                 properties,
-                                                 (from != nullptr) ? (Object^)(targetFrom) : nullptr,
-                                                 targetTo);
-                  }
-                  target->_AdjustContentOriginX(storyboard, properties, targetFrom, targetTo);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-
-              target->SetupBackground();
-              double targetValue = (double)toValue;
-
-              target->m_origin.X = (float)targetValue;
-
-              if (target->m_createdTransforms) {
-                  ((TranslateTransform^)((TransformGroup^)target->RenderTransform)->Children->GetAt(1))->X = -targetValue;
-              } else {
-                  target->_CalcTransforms();
-              }
-              if (target->Clip != nullptr) {
-                  ((TranslateTransform^)target->Clip->Transform)->X = targetValue;
-              }
-              target->_AdjustContentOriginX(nullptr, nullptr, nullptr, targetValue);
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    if (!target->m_createdTransforms) {
-                                                        return (double)target->m_origin.X;
-                                                    }
-                                                    return -((double)CALayerXaml::_GetAnimatedTransformIndex(
-                                                        target, 1, TranslateTransform::XProperty));
-                                               })) },
-
-    { "origin.y",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  target->SetupBackground();
-                  double targetFrom = (from != nullptr) ? (double)from : 0.0;
-                  double targetTo = (to != nullptr) ? (double)to : 0.0;
-
-                  CALayerXaml::_AddAnimation("(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)",
-                                             target,
-                                             storyboard,
-                                             properties,
-                                             from != nullptr ? (Object^)(-targetFrom) : nullptr,
-                                             -targetTo);
-                  if (target->m_masksToBounds) {
-                      CALayerXaml::_AddAnimation("(UIElement.Clip).(Transform).(TranslateTransform.Y)",
-                                                 target,
-                                                 storyboard,
-                                                 properties,
-                                                 (from != nullptr) ? (Object^)(targetFrom) : nullptr,
-                                                 targetTo);
-                  }
-                  target->_AdjustContentOriginY(storyboard, properties, targetFrom, targetTo);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              target->SetupBackground();
-              double targetValue = (double)toValue;
-
-              target->m_origin.Y = (float)targetValue;
-
-              if (target->m_createdTransforms) {
-                  ((TranslateTransform^)((TransformGroup^)target->RenderTransform)->Children->GetAt(1))->Y = -targetValue;
-              } else {
-                  target->_CalcTransforms();
-              }
-              if (target->Clip != nullptr) {
-                  ((TranslateTransform^)target->Clip->Transform)->Y = targetValue;
-              }
-              target->_AdjustContentOriginY(nullptr, nullptr, nullptr, targetValue);
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    if (!target->m_createdTransforms) {
-                                                        return (double)target->m_origin.Y;
-                                                    }
-                                                    return -((double)CALayerXaml::_GetAnimatedTransformIndex(
-                                                        target, 1, TranslateTransform::YProperty));
-                                               })) },
-    { "origin",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  s_animatableProperties["origin.x"]->Animate(target,
-                                                              storyboard,
-                                                              properties,
-                                                              (from != nullptr) ? (Object^)((Point)from).X : nullptr,
-                                                              (double)((Point)to).X);
-                  s_animatableProperties["origin.y"]->Animate(target,
-                                                              storyboard,
-                                                              properties,
-                                                              (from != nullptr) ? (Object^)((Point)from).Y : nullptr,
-                                                              (double)((Point)to).Y);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              s_animatableProperties["origin.x"]->Set(target, (double)((Point)toValue).X);
-              s_animatableProperties["origin.y"]->Set(target, (double)((Point)toValue).Y);
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    // Unbox x and y values as doubles, before casting them to floats
-                                                    return Point((float)(double)target->Get("origin.x"),
-                                                                 (float)(double)target->Get("origin.y"));
-                                               })) },
-    { "anchorPoint.x",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  Object^ fromVal = (from != nullptr) ? (Object^)(-target->m_size.Width * (double)from) : nullptr;
-                  double destVal = -target->m_size.Width * (double)to;
-
-                  CALayerXaml::_AddAnimation("(UIElement.RenderTransform).(TransformGroup.Children)[0].(TranslateTransform.X)",
-                                             target,
-                                             storyboard,
-                                             properties,
-                                             fromVal,
-                                             destVal);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              double anchorPointX = (double)toValue;
-              target->m_anchorPoint.X = (float)anchorPointX;
-              if (target->m_createdTransforms) {
-                  double destX = -target->m_size.Width * ((double)toValue);
-                  ((TranslateTransform^)((TransformGroup^)target->RenderTransform)->Children->GetAt(0))->X = destX;
-              } else {
-                  target->_CalcTransforms();
-              }
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^ { return (double)target->m_anchorPoint.X; })) },
-    { "anchorPoint.y",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  Object^ fromVal = (from != nullptr) ? (Object^)(-target->m_size.Height * (double)from) : nullptr;
-                  double destVal = -target->m_size.Height * (double)to;
-
-                  CALayerXaml::_AddAnimation("(UIElement.RenderTransform).(TransformGroup.Children)[0].(TranslateTransform.Y)",
-                                             target,
-                                             storyboard,
-                                             properties,
-                                             fromVal,
-                                             destVal);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              double anchorPointY = (double)toValue;
-              target->m_anchorPoint.Y = (float)anchorPointY;
-              if (target->m_createdTransforms) {
-                  double destY = -target->m_size.Height * ((double)toValue);
-                  ((TranslateTransform^)((TransformGroup^)target->RenderTransform)->Children->GetAt(0))->Y = destY;
-              } else {
-                  target->_CalcTransforms();
-              }
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^ { return (double)target->m_anchorPoint.Y; })) },
-    { "anchorPoint",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  s_animatableProperties["anchorPoint.x"]->Animate(target,
-                                                                   storyboard,
-                                                                   properties,
-                                                                   (from != nullptr) ? (Object^)((Point)from).X : nullptr,
-                                                                   (double)((Point)to).X);
-                  s_animatableProperties["anchorPoint.y"]->Animate(target,
-                                                                   storyboard,
-                                                                   properties,
-                                                                   (from != nullptr) ? (Object^)((Point)from).Y : nullptr,
-                                                                   (double)((Point)to).Y);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              s_animatableProperties["anchorPoint.x"]->Set(target, (double)((Point)toValue).X);
-              s_animatableProperties["anchorPoint.y"]->Set(target, (double)((Point)toValue).Y);
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    // Unbox x and y values as doubles, before casting them to floats
-                                                    return Point((float)(double)target->Get("anchorPoint.x"),
-                                                                 (float)(double)target->Get("anchorPoint.y"));
-                                               })) },
-    { "size.width",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  if (from != nullptr) {
-                      if ((double)from < 0.0) {
-                          from = (double)0.0;
-                      }
-                  }
-                  if (to != nullptr) {
-                      if ((double)to < 0.0) {
-                          to = (double)0.0;
-                      }
-                  }
-
-                  Object^ fromVal = (from != nullptr) ? (Object^)((-((double)from)) * target->m_anchorPoint.X) : nullptr;
-                  double dest = -((double)to) * target->m_anchorPoint.X;
-
-                  CALayerXaml::_AddAnimation("(UIElement.RenderTransform).(TransformGroup.Children)[0].(TranslateTransform.X)",
-                                             target,
-                                             storyboard,
-                                             properties,
-                                             fromVal,
-                                             dest);
-                  CALayerXaml::_AddAnimation("VisualWidth", target, storyboard, properties, from, to, true);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              if (toValue != nullptr) {
-                  if ((double)toValue < 0.0) {
-                      toValue = (double)0.0;
-                  }
-              }
-              if (target->m_size.Width == (double)toValue) {
-                  return;
-              }
-
-              double width = (double)toValue;
-              target->m_size.Width = (float)width;
-              target->Width = width;
-
-              if (target->m_createdTransforms) {
-                  double destX = -((double)toValue) * target->m_anchorPoint.X;
-                  ((TranslateTransform^)((TransformGroup^)target->RenderTransform)->Children->GetAt(0))->X = destX;
-                  target->VisualWidth = (double)toValue;
-              } else {
-                  target->_CalcTransforms();
-              }
-              target->InvalidateArrange();
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    if (!target->m_createdTransforms) {
-                                                        return (double)target->m_size.Width;
-                                                    }
-                                                    return target->GetValue(CALayerXaml::VisualWidthProperty);
-                                               })) },
-    { "size.height",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  if (from != nullptr) {
-                      if ((double)from < 0.0) {
-                          from = (double)0.0;
-                      }
-                  }
-                  if (to != nullptr) {
-                      if ((double)to < 0.0) {
-                          to = (double)0.0;
-                      }
-                  }
-                  Object^ fromVal = (from != nullptr) ? (Object^)((-((double)from)) * target->m_anchorPoint.Y) : nullptr;
-                  double dest = -((double)to) * target->m_anchorPoint.Y;
-
-                  CALayerXaml::_AddAnimation("(UIElement.RenderTransform).(TransformGroup.Children)[0].(TranslateTransform.Y)",
-                                             target,
-                                             storyboard,
-                                             properties,
-                                             fromVal,
-                                             dest);
-                  CALayerXaml::_AddAnimation("VisualHeight", target, storyboard, properties, from, to, true);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              if (toValue != nullptr) {
-                  if ((double)toValue < 0.0) {
-                      toValue = (double)0.0;
-                  }
-              }
-              if (target->m_size.Height == (double)toValue) {
-                  return;
-              }
-
-              double height = (double)toValue;
-              target->m_size.Height = (float)height;
-              target->Height = height;
-
-              if (target->m_createdTransforms) {
-                  double destY = -((double)toValue) * target->m_anchorPoint.Y;
-                  ((TranslateTransform^)((TransformGroup^)target->RenderTransform)->Children->GetAt(0))->Y = destY;
-                  target->VisualHeight = (double)toValue;
-              } else {
-                  target->_CalcTransforms();
-              }
-              target->InvalidateArrange();
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    if (!target->m_createdTransforms) {
-                                                        return (double)target->m_size.Height;
-                                                    }
-                                                    return target->GetValue(CALayerXaml::VisualHeightProperty);
-                                               })) },
-    { "size",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  s_animatableProperties["size.width"]->Animate(target,
-                                                                storyboard,
-                                                                properties,
-                                                                (from != nullptr) ? (Object^)((Size)from).Width : nullptr,
-                                                                (double)((Size)to).Width);
-                  s_animatableProperties["size.height"]->Animate(target,
-                                                                 storyboard,
-                                                                 properties,
-                                                                 (from != nullptr) ? (Object^)((Size)from).Height : nullptr,
-                                                                 (double)((Size)to).Height);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              s_animatableProperties["size.width"]->Set(target, (double)((Size)toValue).Width);
-              s_animatableProperties["size.height"]->Set(target, (double)((Size)toValue).Height);
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    // Unbox width and height values as doubles, before casting them to floats
-                                                    return Size((float)(double)target->Get("size.width"),
-                                                                (float)(double)target->Get("size.height"));
-                                               })) },
-    { "transform.rotation",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  CALayerXaml::_AddAnimation(
-                      "(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[0].(RotateTransform.Angle)",
-                      target,
-                      storyboard,
-                      properties,
-                      from,
-                      to);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              target->_CreateTransforms();
-              ((RotateTransform^)((TransformGroup^)((TransformGroup^)target->RenderTransform)->Children->GetAt(2))
-                   ->Children->GetAt(0))
-                  ->Angle = (double)toValue;
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                                  {
-                                                    if (!target->m_createdTransforms) {
-                                                        return (double)0.0;
-                                                    }
-                                                    return CALayerXaml::_GetGeneralTransformIndex(
-                                                        target, 0, RotateTransform::AngleProperty);
-                                                  })) },
-    { "transform.scale.x",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  CALayerXaml::_AddAnimation(
-                      "(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[1].(ScaleTransform.ScaleX)",
-                      target,
-                      storyboard,
-                      properties,
-                      from,
-                      to);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              target->_CreateTransforms();
-              ((ScaleTransform^)((TransformGroup^)((TransformGroup^)target->RenderTransform)->Children->GetAt(2))->Children->GetAt(1))
-                  ->ScaleX = (double)toValue;
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    if (!target->m_createdTransforms) {
-                                                        return (double)0.0;
-                                                    }
-                                                    return CALayerXaml::_GetGeneralTransformIndex(
-                                                        target, 1, ScaleTransform::ScaleXProperty);
-                                                })) },
-    { "transform.scale.y",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  CALayerXaml::_AddAnimation(
-                      "(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[1].(ScaleTransform.ScaleY)",
-                      target,
-                      storyboard,
-                      properties,
-                      from,
-                      to);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              target->_CreateTransforms();
-              ((ScaleTransform^)((TransformGroup^)((TransformGroup^)target->RenderTransform)->Children->GetAt(2))->Children->GetAt(1))
-                  ->ScaleY = (double)toValue;
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    if (!target->m_createdTransforms) {
-                                                        return (double)0.0;
-                                                    }
-                                                    return CALayerXaml::_GetGeneralTransformIndex(
-                                                        target, 1, ScaleTransform::ScaleYProperty);
-                                               })) },
-    { "transform.translation.x",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  CALayerXaml::_AddAnimation(
-                      "(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[2].(TranslateTransform.X)",
-                      target,
-                      storyboard,
-                      properties,
-                      from,
-                      to);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              target->_CreateTransforms();
-              ((TranslateTransform^)((TransformGroup^)((TransformGroup^)target->RenderTransform)->Children->GetAt(2))
-                   ->Children->GetAt(2))
-                  ->X = (double)toValue;
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    if (!target->m_createdTransforms) {
-                                                        return (double)0.0;
-                                                    }
-                                                    return CALayerXaml::_GetGeneralTransformIndex(
-                                                        target, 2, TranslateTransform::XProperty);
-                                               })) },
-    { "transform.translation.y",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  target->_CreateTransforms();
-                  CALayerXaml::_AddAnimation(
-                      "(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[2].(TranslateTransform.Y)",
-                      target,
-                      storyboard,
-                      properties,
-                      from,
-                      to);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              target->_CreateTransforms();
-              ((TranslateTransform^)((TransformGroup^)((TransformGroup^)target->RenderTransform)->Children->GetAt(2))
-                   ->Children->GetAt(2))
-                  ->Y = (double)toValue;
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^
-                                               {
-                                                    if (!target->m_createdTransforms) {
-                                                        return (double)0.0;
-                                                    }
-                                                    return CALayerXaml::_GetGeneralTransformIndex(
-                                                        target, 2, TranslateTransform::YProperty);
-                                               })) },
-    { "opacity",
-      ref new CALayerXaml::AnimatableProperty(
-          ref new CALayerXaml::ApplyAnimationFunction(
-              [](CALayerXaml^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-                  CALayerXaml::_AddAnimation("(UIElement.Opacity)", target, storyboard, properties, from, to);
-              }),
-          ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-              target->m_opacity = (double)toValue;
-              target->SetOpacity();
-          }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^ { return target->m_opacity; })) },
-    { "gravity",
-      ref new CALayerXaml::AnimatableProperty(
-          nullptr,
-          ref new CALayerXaml::ApplyTransformFunction(
-              [](CALayerXaml^ target, Object^ toValue) { target->SetContentGravity((ContentGravity)(int)toValue); }),
-          ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target) -> Object^ { return (int)target->m_contentGravity; })) },
-    { "masksToBounds",
-      ref new CALayerXaml::AnimatableProperty(nullptr,
-                                              ref new CALayerXaml::ApplyTransformFunction([](CALayerXaml^ target, Object^ toValue) {
-                                                  target->m_masksToBounds = (bool)toValue;
-                                                  target->Clip = target->m_masksToBounds ? target->m_clipGeometry : nullptr;
-                                              }),
-                                              ref new CALayerXaml::GetCurrentValue([](CALayerXaml^ target)
-                                                                                       -> Object^ { return target->m_masksToBounds; })) },
-};
-
-void CALayerXaml::Reset() {
-    __super::Children->Clear();
-    InvalidateArrange();
-    m_content = nullptr;
-    m_contentsCenter = Rect(0, 0, 1, 1);
-    m_contentGravity = ContentGravity::Resize;
-    Clip = nullptr;
-    m_invOriginTransform = ref new TranslateTransform();
-    m_clipGeometry = ref new RectangleGeometry();
-    m_clipGeometry->Transform = m_invOriginTransform;
-    RenderTransform = ref new TranslateTransform();
-    m_position = Point(0, 0);
-    m_origin = Point(0, 0);
-    m_size = Size(0, 0);
-    m_hidden = false;
-    m_originSet = false;
-    m_createdTransforms = false;
-    LayerOpacity = 1.0;
-
-    IsHitTestVisible = true; // Always hit-testable by default
-
-    Set("anchorPoint", Point(0.5, 0.5));
-    m_masksToBounds = false;
-
-    __super::Background = _TransparentBrush;
-
-    // Due to the nature of how we lay out our CALayerXamls as 1x1 panels, we need an actual backing element
-    // that we can use for hit testing purposes.  Without this backing rectangle, we are unable accept pointer
-    // input at the appropriate location in many instances.  For example, we wouldn't be able to click on a UIView
-    // that hasn't set a background or any content, which is incorrect behavior.  This will be revisited when
-    // we move the code closer to UI.Composition Visual usage.
-    SetBackgroundColor(0, 0, 0, 0);
-}
-
-CALayerXaml^ CALayerXaml::CreateLayer() {
-    ICacheableObject^ ret = _LayerContentCache->GetCachableObject();
-    if (ret != nullptr) {
-        return (CALayerXaml^)ret;
-    }
-
-    CALayerXaml^ newLayer = ref new CALayerXaml();
-
-    auto layerVisual = ElementCompositionPreview::GetElementVisual(newLayer);
-    layerVisual->BorderMode = CompositionBorderMode::Hard;
-
-    return newLayer;
-}
-
-void CALayerXaml::DestroyLayer(CALayerXaml^ layer) {
-    layer->_DiscardContent();
-    _LayerContentCache->PushCacheableObject(layer);
-}
-
-void CALayerXaml::ApplyMagnificationFactor(Canvas^ windowContainer, float scale, float rotation) {
-    TransformGroup^ globalTransform = ref new TransformGroup();
-    ScaleTransform^ windowScale = ref new ScaleTransform();
-    RotateTransform^ orientation = ref new RotateTransform();
-
-    windowScale->ScaleX = scale;
-    windowScale->ScaleY = scale;
-    windowScale->CenterX = windowContainer->Width / 2.0;
-    windowScale->CenterY = windowContainer->Height / 2.0;
-
-    globalTransform->Children->Append(windowScale);
-    if (rotation != 0.0) {
-        orientation->Angle = rotation;
-        orientation->CenterX = windowContainer->Width / 2.0;
-        orientation->CenterY = windowContainer->Height / 2.0;
-
-        globalTransform->Children->Append(orientation);
-    }
-
-    windowContainer->RenderTransform = globalTransform;
-    CALayerXaml::s_screenScale = (double)scale;
-}
-
-void CALayerXaml::_AddAnimation(String^ propertyName,
-                               UIElement^ target,
-                               Storyboard^ storyboard,
-                               DoubleAnimation^ copyProperties,
-                               Object^ fromValue,
-                               Object^ toValue,
-                               bool dependent) {
-    DoubleAnimation^ posxAnim = ref new DoubleAnimation();
-    if (toValue != nullptr) {
-        posxAnim->To = (double)toValue;
-    }
-    if (fromValue != nullptr) {
-        posxAnim->From = (double)fromValue;
-    }
-    posxAnim->Duration = copyProperties->Duration;
-    posxAnim->RepeatBehavior = copyProperties->RepeatBehavior;
-    posxAnim->AutoReverse = copyProperties->AutoReverse;
-    posxAnim->EasingFunction = copyProperties->EasingFunction;
-    posxAnim->EnableDependentAnimation = dependent;
-    posxAnim->FillBehavior = copyProperties->FillBehavior;
-    posxAnim->BeginTime = copyProperties->BeginTime;
-    storyboard->Children->Append(posxAnim);
-
-    Storyboard::SetTarget(posxAnim, target);
-    Storyboard::SetTargetProperty(posxAnim, propertyName);
-}
-
-Object^ CALayerXaml::_GetAnimatedTransformIndex(UIElement^ element, int idx, DependencyProperty^ property) {
-    TransformGroup^ grp = (TransformGroup^)element->GetValue(UIElement::RenderTransformProperty);
-    TransformCollection^ children = (TransformCollection^)grp->GetValue(TransformGroup::ChildrenProperty);
-    DependencyObject^ transform = (DependencyObject^)children->GetAt(idx);
-
-    return transform->GetValue(property);
-}
-
-Object^ CALayerXaml::_GetGeneralTransformIndex(UIElement^ element, int idx, DependencyProperty^ property) {
-    TransformGroup^ grp = (TransformGroup^)element->GetValue(UIElement::RenderTransformProperty);
-    TransformCollection^ children = (TransformCollection^)grp->GetValue(TransformGroup::ChildrenProperty);
-    TransformGroup^ transform = (TransformGroup^)children->GetAt(2);
-    TransformCollection^ generalTransformChildren = (TransformCollection^)transform->GetValue(TransformGroup::ChildrenProperty);
-    DependencyObject^ innerTransform = (DependencyObject^)generalTransformChildren->GetAt(idx);
-
-    return innerTransform->GetValue(property);
-}
-
-void CALayerXaml::_AdjustContentOriginX(Storyboard^ storyboard, DoubleAnimation^ properties, Object^ fromValue, Object^ toValue) {
-    if (m_content == nullptr) {
-        return;
-    }
-    if (storyboard != nullptr) {
-        _AddAnimation("(UIElement.RenderTransform).(TranslateTransform.X)",
-                      m_content,
-                      storyboard,
-                      properties,
-                      fromValue != nullptr ? (Object^)fromValue : nullptr,
-                      toValue);
-    } else {
-        ((TranslateTransform^)m_content->RenderTransform)->X = (double)toValue;
-    }
-
-    if (Util::isInstanceOf<LayerContent^>(m_content)) {
-        static_cast<LayerContent^>(m_content)->_AdjustContentOriginX(storyboard, properties, fromValue, toValue);
-    }
-}
-
-void CALayerXaml::_AdjustContentOriginY(Storyboard^ storyboard, DoubleAnimation^ properties, Object^ fromValue, Object^ toValue) {
-    if (m_content == nullptr) {
-        return;
-    }
-    if (storyboard != nullptr) {
-        _AddAnimation("(UIElement.RenderTransform).(TranslateTransform.Y)",
-                      m_content,
-                      storyboard,
-                      properties,
-                      fromValue != nullptr ? (Object^)fromValue : nullptr,
-                      toValue);
-    } else {
-        ((TranslateTransform^)m_content->RenderTransform)->Y = (double)toValue;
-    }
-
-    if (Util::isInstanceOf<LayerContent^>(m_content)) {
-        static_cast<LayerContent^>(m_content)->_AdjustContentOriginY(storyboard, properties, fromValue, toValue);
-    }
-}
-
-void CALayerXaml::_CalcTransforms() {
-    if (!m_createdTransforms) {
-        Point destTranslation;
-
-        destTranslation.X = -m_size.Width * m_anchorPoint.X;
-        destTranslation.Y = -m_size.Height * m_anchorPoint.Y;
-        destTranslation.X -= m_origin.X;
-        destTranslation.Y -= m_origin.Y;
-        destTranslation.X += m_position.X;
-        destTranslation.Y += m_position.Y;
-
-        ((TranslateTransform^)RenderTransform)->X = destTranslation.X;
-        ((TranslateTransform^)RenderTransform)->Y = destTranslation.Y;
-    }
-}
-
-void CALayerXaml::_CreateTransforms() {
-    if (!m_createdTransforms) {
-        TranslateTransform^ SizeAnchorTransform = ref new TranslateTransform();
-        SizeAnchorTransform->X = -m_size.Width * m_anchorPoint.X;
-        SizeAnchorTransform->Y = -m_size.Height * m_anchorPoint.Y;
-
-        TranslateTransform^ OriginTransform = ref new TranslateTransform();
-        OriginTransform->X = -m_origin.X;
-        OriginTransform->Y = -m_origin.Y;
-
-        TransformGroup^ ContentTransform = ref new TransformGroup();
-        ContentTransform->Children->Append(ref new RotateTransform());
-        ContentTransform->Children->Append(ref new ScaleTransform());
-        ContentTransform->Children->Append(ref new TranslateTransform());
-
-        TranslateTransform^ PositionTransform = ref new TranslateTransform();
-        PositionTransform->X = m_position.X;
-        PositionTransform->Y = m_position.Y;
-
-        TransformGroup^ LayerTransforms = ref new TransformGroup();
-        LayerTransforms->Children->Append(SizeAnchorTransform);
-        LayerTransforms->Children->Append(OriginTransform);
-        LayerTransforms->Children->Append(ContentTransform);
-        LayerTransforms->Children->Append(PositionTransform);
-        RenderTransform = LayerTransforms;
-
-        VisualWidth = m_size.Width;
-        VisualHeight = m_size.Height;
-        m_createdTransforms = true;
-    }
-}
-
-void CALayerXaml::Set(String^ propertyName, Object^ value) {
-    CALayerXaml::s_animatableProperties[propertyName]->Set(this, value);
-}
-
-Object^ CALayerXaml::Get(String^ propertyName) {
-    return CALayerXaml::s_animatableProperties[propertyName]->GetValue(this);
-}
-
-void CALayerXaml::SetOpacity() {
-    if (m_hidden) {
-        __super::Opacity = 0.0;
-    } else {
-        __super::Opacity = m_opacity;
-    }
-};
-
-void CALayerXaml::SetZIndex(int zIndex) {
-    __super::SetValue(Canvas::ZIndexProperty, zIndex);
-}
-
-/* Disable for now
-AutomationPeer^ CALayerXaml::OnCreateAutomationPeer()
-{
-    return ref new CALayerXamlAutomationPeer(this);
-}
-*/
-
-void CALayerXaml::SizeChangedCallback(DependencyObject^ d, DependencyPropertyChangedEventArgs^ e) {
-    ((CALayerXaml^)d)->InvalidateArrange();
-}
-
-CALayerXaml::CALayerXaml() {
-    Name = L"LayoutElement";
-    m_invOriginTransform = ref new TranslateTransform();
-    m_clipGeometry = ref new RectangleGeometry();
-    m_clipGeometry->Transform = m_invOriginTransform;
-    RenderTransform = ref new TranslateTransform();
-
-    Set("anchorPoint", Point(0.5, 0.5));
-    LayerOpacity = 1.0;
-
-    Background = _TransparentBrush;
-
-    // note-nithishm-03252016 - DependencyProperty are registered with Panel class instead of CALayerXaml class, as we found that
-    // while property look up, the code starts with the base class and not the current class. This might be a bug but for now as a
-    // workaround register with the base class.
-    if (s_visualWidthProperty == nullptr) {
-        s_visualWidthProperty = DependencyProperty::Register("VisualWidth",
-                                                             double::typeid,
-                                                             Panel::typeid,
-                                                             ref new PropertyMetadata((Platform::Object^ )0.0,
-                                                                ref new PropertyChangedCallback(&CALayerXaml::SizeChangedCallback)));
-    }
-    if (s_visualHeightProperty == nullptr) {
-        s_visualHeightProperty = DependencyProperty::Register("VisualHeight",
-                                                              double::typeid,
-                                                              Panel::typeid,
-                                                              ref new PropertyMetadata((Platform::Object^ )0.0,
-                                                              ref new PropertyChangedCallback(&CALayerXaml::SizeChangedCallback)));
-    }
-
-    // Always start off with a clean slate.
-    Reset();
-}
-
-void CALayerXaml::_CopyPropertiesFrom(CALayerXaml^ fromLayer) {
-    Set("opacity", fromLayer->Get("opacity"));
-    Set("position", fromLayer->Get("position"));
-    Set("size", fromLayer->Get("size"));
-    Set("anchorPoint", fromLayer->Get("anchorPoint"));
-}
-
-void CALayerXaml::_DiscardContent() {
-    if (m_content != nullptr) {
-        unsigned int index;
-        if (Children->IndexOf(m_content, &index)) {
-            Children->RemoveAt(index);
-        }
-        InvalidateArrange();
-
-        if (Util::isInstanceOf<LayerContent^>(m_content)) {
-            LayerContent::DestroyLayerContent((LayerContent^)m_content);
-        }
-        m_content = nullptr;
-    }
-}
-
-void CALayerXaml::_SetContent(FrameworkElement^ element) {
-    if (m_content == element) {
-        return;
-    }
-
-    _DiscardContent();
-
-    m_content = element;
-    if (element != nullptr) {
-        m_content->RenderTransform = m_invOriginTransform;
-        this->Children->InsertAt(0, m_content);
-        InvalidateArrange();
-    }
-}
-
-LayerContent^ CALayerXaml::_GetLayerContent(bool create) {
-    if (!Util::isInstanceOf<LayerContent^>(m_content)) {
-        if (!create) {
-            return nullptr;
-        }
-
-        LayerContent^ imageContent = LayerContent::CreateLayerContent();
-        imageContent->SetGravity(m_contentGravity);
-        imageContent->SetContentsCenter(m_contentsCenter);
-        imageContent->Background = m_backgroundBrush;
-        imageContent->_AdjustContentOriginX(nullptr, nullptr, nullptr, (double)m_origin.X);
-        imageContent->_AdjustContentOriginY(nullptr, nullptr, nullptr, (double)m_origin.Y);
-        __super::Background = _TransparentBrush;
-
-        _SetContent(imageContent);
-    }
-
-    return (LayerContent^)m_content;
-}
-
-void CALayerXaml::SetContentGravity(ContentGravity gravity) {
-    m_contentGravity = gravity;
-    auto layoutContent = _GetLayerContent();
-    if (layoutContent != nullptr) {
-        layoutContent->SetGravity(gravity);
-    }
-}
-
-void CALayerXaml::SetContentsCenter(Rect rect) {
-    m_contentsCenter = rect;
-    auto layoutContent = _GetLayerContent();
-    if (layoutContent != nullptr) {
-        layoutContent->SetContentsCenter(m_contentsCenter);
-    }
-}
-
-void CALayerXaml::SetupBackground() {
-    if (m_content == nullptr) {
-        Rectangle^ rect = ref new Rectangle();
-        _SetContent(rect);
-    }
-
-    if (Util::isInstanceOf<Rectangle^>(m_content)) {
-        static_cast<Rectangle^>(m_content)->Fill = m_backgroundBrush;
-    } else {
-        static_cast<Panel^>(m_content)->Background = m_backgroundBrush;
-    }
-}
-
-void CALayerXaml::SetBackgroundColor(float r, float g, float b, float a) {
-    m_backgroundColor.R = (unsigned char)(r * 255.0);
-    m_backgroundColor.G = (unsigned char)(g * 255.0);
-    m_backgroundColor.B = (unsigned char)(b * 255.0);
-    m_backgroundColor.A = (unsigned char)(a * 255.0);
-    if (m_backgroundColor.A == 0) {
-        m_backgroundBrush = _TransparentBrush;
-    } else {
-        m_backgroundBrush = ref new SolidColorBrush(m_backgroundColor);
-    }
-
-    SetupBackground();
-}
-
-void CALayerXaml::SetTopMost() {
-    _SetContent(nullptr);
-    __super::Background = nullptr;
-}
-
-void CALayerXaml::SetContentImage(ImageSource^ source, float width, float height, float scale) {
-    if (source == nullptr) {
-        if (Util::isInstanceOf<LayerContent^>(m_content)) {
-            _SetContent(nullptr);
-            SetupBackground();
-        }
-    } else {
-        LayerContent^ c = _GetLayerContent(true);
-        c->SetImageContent(source, width, height);
-        c->SetContentParams(width, height, scale);
-    }
-}
-
-void CALayerXaml::SetContentElement(FrameworkElement^ elem, float width, float height, float scale) {
-    if (elem == nullptr) {
-        if (Util::isInstanceOf<LayerContent^>(m_content)) {
-            _SetContent(nullptr);
-            SetupBackground();
-        }
-    } else {
-        LayerContent^ c = _GetLayerContent(true);
-        c->SetElementContent(elem);
-        c->SetContentParams(width, height, scale);
-    }
-}
-
-Size CALayerXaml::ArrangeOverride(Size finalSize) {
-    float curWidth = CurrentWidth;
-    float curHeight = CurrentHeight;
-    if (m_clipGeometry->Rect.Width != curWidth || m_clipGeometry->Rect.Height != curHeight) {
-        m_clipGeometry->Rect = Rect(0, 0, curWidth, curHeight);
-    }
-
-    if (m_content != nullptr) {
-        m_content->Width = curWidth;
-        m_content->Height = curHeight;
-        m_content->Arrange(Rect(0, 0, curWidth, curHeight));
-    }
-
-    unsigned int childrenSize = Children->Size;
-    for (unsigned int index = 0; index < childrenSize; index++) {
-        FrameworkElement^ curChild = static_cast<FrameworkElement^>(Children->GetAt(index));
-        if (curChild == m_content) {
-            continue;
-        }
-        CALayerXaml^ subLayer = dynamic_cast<CALayerXaml^>(curChild);
-        if (subLayer != nullptr) {
-            subLayer->Arrange(Rect(0, 0, 1.0, 1.0));
-        }  else {
-            curChild->Arrange(Rect(0, 0, curWidth, curHeight));
-        }
-    }
-
-    Size ret;
-    if (Util::isInstanceOf<CALayerXaml^>(Parent)) {
-        ret = Size(1, 1);
-    } else {
-        ret = Size(curWidth, curHeight);
-    }
-
-    return ret;
-}
-
-Size CALayerXaml::MeasureOverride(Size availableSize) {
-    unsigned int childrenSize = Children->Size;
-    for (unsigned int index = 0; index < childrenSize; index++) {
-        FrameworkElement^ curChild = (FrameworkElement^)Children->GetAt(index);
-        if (curChild == m_content) {
-            continue;
-        }
-
-        if (!Util::isInstanceOf<CALayerXaml^>(curChild)) {
-            curChild->Measure(availableSize);
-        }
-    }
-
-    return m_size;
-}
-
-//
+////////////////////////////////////////////////////////////////////////////
+// TODO: MOVE TO DISPLAYANIMATION.CPP
 // EventedStoryboard
-//
 static const double c_hundredNanoSeconds = 10000000.0;
 
 EventedStoryboard::EventedStoryboard() {
@@ -1566,13 +107,10 @@ void EventedStoryboard::Start() {
 }
 
 void EventedStoryboard::Abort() {
-    for (Animation^ curAnim : m_animations) {
-        Object^ curValue = CALayerXaml::s_animatableProperties[curAnim->propertyName]->GetValue(m_animatedLayer);
-        CALayerXaml::s_animatableProperties[curAnim->propertyName]->Set(m_animatedLayer, curValue);
-    }
+    UNIMPLEMENTED();
 }
 
-void EventedStoryboard::_CreateFlip(CALayerXaml^ layer, bool flipRight, bool invert, bool removeFromParent) {
+void EventedStoryboard::_CreateFlip(Layer^ layer, bool flipRight, bool invert, bool removeFromParent) {
     if (layer->Projection == nullptr) {
         layer->Projection = ref new PlaneProjection();
     }
@@ -1597,8 +135,8 @@ void EventedStoryboard::_CreateFlip(CALayerXaml^ layer, bool flipRight, bool inv
         }
     }
 
-    ((PlaneProjection^)layer->Projection)->CenterOfRotationX = layer->CurrentWidth / 2;
-    ((PlaneProjection^)layer->Projection)->CenterOfRotationY = layer->CurrentHeight / 2;
+    ((PlaneProjection^)layer->Projection)->CenterOfRotationX = CoreAnimation::LayerProperties::GetVisualWidth(layer) / 2;
+    ((PlaneProjection^)layer->Projection)->CenterOfRotationY = CoreAnimation::LayerProperties::GetVisualHeight(layer) / 2;
     Storyboard::SetTargetProperty(rotateAnim, "(UIElement.Projection).(PlaneProjection.RotationY)");
     Storyboard::SetTarget(rotateAnim, layer);
     m_container->Children->Append(rotateAnim);
@@ -1653,7 +191,7 @@ void EventedStoryboard::_CreateFlip(CALayerXaml^ layer, bool flipRight, bool inv
     m_container->Children->Append(fade1);
 }
 
-void EventedStoryboard::_CreateWoosh(CALayerXaml^ layer, bool fromRight, bool invert, bool removeFromParent) {
+void EventedStoryboard::_CreateWoosh(Layer^ layer, bool fromRight, bool invert, bool removeFromParent) {
     if (layer->Projection == nullptr) {
         layer->Projection = ref new PlaneProjection();
     }
@@ -1665,18 +203,18 @@ void EventedStoryboard::_CreateWoosh(CALayerXaml^ layer, bool fromRight, bool in
 
     if (!invert) {
         if (fromRight) {
-            wooshAnim->From = (double)layer->CurrentWidth;
+            wooshAnim->From = (double)CoreAnimation::LayerProperties::GetVisualWidth(layer);
             wooshAnim->To = 0.01;
         } else {
             wooshAnim->From = 0.01;
-            wooshAnim->To = (double)layer->CurrentWidth;
+            wooshAnim->To = (double)CoreAnimation::LayerProperties::GetVisualWidth(layer);
         }
     } else {
         if (fromRight) {
             wooshAnim->From = 0.01;
-            wooshAnim->To = (double)(-layer->CurrentWidth / 4);
+            wooshAnim->To = (double)(-CoreAnimation::LayerProperties::GetVisualWidth(layer) / 4);
         } else {
-            wooshAnim->From = (double)(-layer->CurrentWidth / 4);
+            wooshAnim->From = (double)(-CoreAnimation::LayerProperties::GetVisualWidth(layer) / 4);
             wooshAnim->To = 0.01;
         }
     }
@@ -1698,13 +236,14 @@ void EventedStoryboard::_CreateWoosh(CALayerXaml^ layer, bool fromRight, bool in
     m_container->Children->Append(wooshAnim);
 }
 
-concurrency::task<CALayerXaml^> EventedStoryboard::SnapshotLayer(CALayerXaml^ layer) {
-    if (((layer->m_size.Height == 0) && (layer->m_size.Width == 0)) || (layer->Opacity == 0)) {
-        return concurrency::task_from_result<CALayerXaml^>(nullptr);
+concurrency::task<Layer^> EventedStoryboard::SnapshotLayer(Layer^ layer) {
+    if (((layer->Height == 0) && (layer->Width == 0)) || (layer->Opacity == 0)) {
+        return concurrency::task_from_result<Layer^>(nullptr);
     }
     else {
         RenderTargetBitmap^ snapshot = ref new RenderTargetBitmap();
-        return concurrency::create_task(snapshot->RenderAsync(layer, (int)(layer->CurrentWidth * CALayerXaml::s_screenScale), 0))
+        return concurrency::create_task(
+                snapshot->RenderAsync(layer, static_cast<int>(CoreAnimation::LayerProperties::GetVisualWidth(layer) * DisplayProperties::s_screenScale), 0))
             .then([snapshot, layer](concurrency::task<void> result) noexcept {
             try {
                 result.get();
@@ -1714,35 +253,50 @@ concurrency::task<CALayerXaml^> EventedStoryboard::SnapshotLayer(CALayerXaml^ la
                              L"RenderAsync threw InvalidArgumentException exception - [%ld]%s",
                              ex->HResult,
                              ex->Message);
-                return (CALayerXaml^)nullptr;
+                return static_cast<Layer^>(nullptr);
             }
 
             // Return a new 'copy' layer with the rendered content
-            CALayerXaml^ newLayer = CALayerXaml::CreateLayer();
-            newLayer->_CopyPropertiesFrom(layer);
+            Layer^ newLayer = ref new Layer();
+            CoreAnimation::LayerProperties::InitializeFrameworkElement(newLayer);
+
+            // Copy display properties from the old layer to the new layer
+            CoreAnimation::LayerProperties::SetValue(newLayer, "opacity", CoreAnimation::LayerProperties::GetValue(layer, "opacity"));
+            CoreAnimation::LayerProperties::SetValue(newLayer, "position", CoreAnimation::LayerProperties::GetValue(layer, "position"));
+            CoreAnimation::LayerProperties::SetValue(newLayer, "size", CoreAnimation::LayerProperties::GetValue(layer, "size"));
+            CoreAnimation::LayerProperties::SetValue(newLayer, "anchorPoint", CoreAnimation::LayerProperties::GetValue(layer, "anchorPoint"));
 
             int width = snapshot->PixelWidth;
             int height = snapshot->PixelHeight;
             DisplayInformation^ dispInfo = Windows::Graphics::Display::DisplayInformation::GetForCurrentView();
 
-            newLayer->SetContentImage(snapshot, (float)width, (float)height, (float)(CALayerXaml::s_screenScale * dispInfo->RawPixelsPerViewPixel));
+            // Set the snapshot as the content of the new layer
+            CoreAnimation::LayerProperties::SetContent(
+                newLayer, 
+                snapshot,
+                static_cast<float>(width),
+                static_cast<float>(height), 
+                static_cast<float>(DisplayProperties::s_screenScale * dispInfo->RawPixelsPerViewPixel));
 
             // There seems to be a bug in Xaml where Render'd layers get sized to their visible content... sort of.
             // If the UIViewController being transitioned away from has transparent content, the height returned is less the
             // navigation bar, as though Xaml sizes the buffer to the largest child Visual, and only expands where needed.
             // Top/bottom switched due to geometric origin of CALayer so read this as UIViewContentModeTopLeft
-            newLayer->SetContentGravity(ContentGravity::BottomLeft);
+            CoreAnimation::LayerProperties::SetContentGravity(newLayer, CoreAnimation::ContentGravity::BottomLeft);
 
             return newLayer;
         }, concurrency::task_continuation_context::use_current());
     }
 }
 
-void EventedStoryboard::AddTransition(CALayerXaml^ realLayer, CALayerXaml^ snapshotLayer, String^ type, String^ subtype) {
+void EventedStoryboard::AddTransition(Layer^ realLayer, Layer^ snapshotLayer, String^ type, String^ subtype) {
     if (type == "kCATransitionFlip") {
         TimeSpan timeSpan = TimeSpan();
         timeSpan.Duration = (long long)(0.75 * c_hundredNanoSeconds);
         m_container->Duration = Duration(timeSpan);
+        
+        auto wtf = VisualTreeHelper::GetParent(realLayer);
+
         Panel^ parent = (Panel^)VisualTreeHelper::GetParent(realLayer);
 
         bool flipToLeft = true;
@@ -1800,41 +354,1216 @@ void EventedStoryboard::AddTransition(CALayerXaml^ realLayer, CALayerXaml^ snaps
     }
 }
 
-void EventedStoryboard::Animate(CALayerXaml^ layer, String^ propertyName, Object^ from, Object^ to) {
+void EventedStoryboard::Animate(FrameworkElement^ layer, String^ propertyName, Object^ from, Object^ to) {
     DoubleAnimation^ timeline = ref new DoubleAnimation();
     timeline->Duration = m_container->Duration;
     timeline->EasingFunction = m_animationEase;
-
-    CALayerXaml::s_animatableProperties[propertyName]->Animate(layer, m_container, timeline, from, to);
+    CoreAnimation::LayerProperties::AnimateValue(layer, m_container, timeline, propertyName, from, to);
 }
 
 Object^ EventedStoryboard::GetStoryboard() {
     return m_container;
 }
 
-//
-// CATextLayerXaml
-//
-void CATextLayerXaml::Reset() {
-    TextBlock->Text = "";
-    TextBlock->Width = std::nan(NULL);
-    TextBlock->Height = std::nan(NULL);
+/////////////////////////////////////////////
+// CoreAnimation Support - DisplayProperties
+// TODO:MOVE TO DISPLAYPROPERTIES.CPP
+double DisplayProperties::s_screenScale = 1.0;
+
+//////////////////////////////////////////////////////////////////////////////
+// TODO:MOVE TO LAYERPROPERTIES.CPP
+// Provides support for setting, animating and retrieving values.
+delegate void ApplyAnimationFunction(FrameworkElement^ target,
+    Storyboard^ storyboard,
+    DoubleAnimation^ properties,
+    Object^ fromValue,
+    Object^ toValue);
+delegate void ApplyTransformFunction(FrameworkElement^ target, Object^ toValue);
+delegate Object^ GetCurrentValueFunction(FrameworkElement^ target);
+
+/////////////////////////////////////////////////////////
+// TODO: SWITCH TO STD::FUNCTIONS
+/////////////////////////////////////////////////////////
+ref class AnimatableProperty sealed {
+public:
+    property ApplyAnimationFunction^ AnimateValue;
+    property ApplyTransformFunction^ SetValue;
+    property GetCurrentValueFunction^ GetValue;
+
+    AnimatableProperty(ApplyAnimationFunction^ animate, ApplyTransformFunction^ set, GetCurrentValueFunction^ get) {
+        AnimateValue = animate;
+        SetValue = set;
+        GetValue = get;
+    };
+};
+
+std::map<String^, AnimatableProperty^> s_animatableProperties = {
+    { "position.x",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              // Animate the PositionTransform
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetPositionXTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from,
+                  to);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              auto positionX = static_cast<double>(toValue);
+
+              // Store PositionX
+              LayerProperties::SetPositionX(target, static_cast<float>(positionX));
+
+              // Update the PositionTransform
+              LayerProperties::GetPositionTransform(target)->X = positionX;
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerProperties::GetPositionTransform(target)->X;
+          })) },
+    { "position.y",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              // Animate the PositionTransform
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetPositionYTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from,
+                  to);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              auto positionY = static_cast<double>(toValue);
+
+              // Store PositionY
+              LayerProperties::SetPositionY(target, static_cast<float>(positionY));
+
+              // Update the PositionTransform
+              LayerProperties::GetPositionTransform(target)->Y = positionY;
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerProperties::GetPositionTransform(target)->Y;
+          })) },
+    { "position",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              s_animatableProperties["position.x"]->AnimateValue(target,
+                                                            storyboard,
+                                                            properties,
+                                                            from ? (Object^)((Point)from).X : nullptr,
+                                                            (double)((Point)to).X);
+              s_animatableProperties["position.y"]->AnimateValue(target,
+                                                            storyboard,
+                                                            properties,
+                                                            from ? (Object^)((Point)from).Y : nullptr,
+                                                            (double)((Point)to).Y);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              s_animatableProperties["position.x"]->SetValue(target, (double)((Point)toValue).X);
+              s_animatableProperties["position.y"]->SetValue(target, (double)((Point)toValue).Y);
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              // Unbox x and y values as doubles, before casting them to floats
+              return Point((float)(double)LayerProperties::GetValue(target, "position.x"),
+                           (float)(double)LayerProperties::GetValue(target, "position.y"));
+          })) },
+    { "origin.x",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              // Zero out negative and null values
+              auto fromValue = from ? std::max<double>(0.0, static_cast<double>(from)) : 0.0;
+              auto toValue = to ? std::max<double>(0.0, static_cast<double>(to)) : 0.0;
+
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetOriginXTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from ? static_cast<Object^>(-fromValue) : nullptr,
+                  -toValue);
+
+              // Animate the Clip transform
+              if (target->Clip) {
+                  LayerProperties::AddAnimation(
+                      "(UIElement.Clip).(Transform).(TranslateTransform.X)",
+                      target,
+                      storyboard,
+                      properties,
+                      from ? static_cast<Object^>(fromValue) : nullptr,
+                      toValue);
+              }
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              auto targetValue = static_cast<double>(toValue);
+
+              // Store the new OriginX value
+              LayerProperties::SetOriginX(target, static_cast<float>(targetValue));
+
+              // Update the OriginTransform
+              LayerProperties::GetOriginTransform(target)->X = -targetValue;
+
+              // Update the Clip transform
+              if (target->Clip) {
+                  ((TranslateTransform^)target->Clip->Transform)->X = targetValue;
+              }
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return -(LayerProperties::GetOriginTransform(target)->X);
+          })) },
+    { "origin.y",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              // Zero out negative and null values
+              auto fromValue = from ? std::max<double>(0.0, static_cast<double>(from)) : 0.0;
+              auto toValue = to ? std::max<double>(0.0, static_cast<double>(to)) : 0.0;
+
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetOriginYTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from ? static_cast<Object^>(-fromValue) : nullptr,
+                  -toValue);
+
+              // Animate the Clip transform
+              if (target->Clip) {
+                  LayerProperties::AddAnimation(
+                      "(UIElement.Clip).(Transform).(TranslateTransform.Y)",
+                      target,
+                      storyboard,
+                      properties,
+                      from ? static_cast<Object^>(fromValue) : nullptr,
+                      toValue);
+              }
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              auto targetValue = static_cast<double>(toValue);
+
+              // Store the new OriginY value
+              LayerProperties::SetOriginY(target, static_cast<float>(targetValue));
+
+              // Update the OriginTransform
+              LayerProperties::GetOriginTransform(target)->Y = -targetValue;
+
+              // Update the Clip transform
+              if (target->Clip) {
+                  ((TranslateTransform^)target->Clip->Transform)->Y = targetValue;
+              }
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return -(LayerProperties::GetOriginTransform(target)->Y);
+          })) },
+    { "origin",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              s_animatableProperties["origin.x"]->AnimateValue(target,
+                                                          storyboard,
+                                                          properties,
+                                                          (from != nullptr) ? (Object^)((Point)from).X : nullptr,
+                                                          (double)((Point)to).X);
+              s_animatableProperties["origin.y"]->AnimateValue(target,
+                                                          storyboard,
+                                                          properties,
+                                                          (from != nullptr) ? (Object^)((Point)from).Y : nullptr,
+                                                          (double)((Point)to).Y);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              s_animatableProperties["origin.x"]->SetValue(target, (double)((Point)toValue).X);
+              s_animatableProperties["origin.y"]->SetValue(target, (double)((Point)toValue).Y);
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              // Unbox x and y values as doubles, before casting them to floats
+              return Point((float)(double)LayerProperties::GetValue(target, "origin.x"),
+                           (float)(double)LayerProperties::GetValue(target, "origin.y"));
+          })) },
+    { "anchorPoint.x",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              // Zero out negative and null values
+              auto fromValue = from ? std::max<double>(0.0, static_cast<double>(from)) : 0.0;
+              auto toValue = to ? std::max<double>(0.0, static_cast<double>(to)) : 0.0;
+
+              // Calculate values to animate on the AnchorPoint transform
+              fromValue = -target->Width * fromValue;
+              toValue = -target->Width * toValue;
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetAnchorXTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from ? static_cast<Object^>(fromValue) : nullptr,
+                  toValue);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              // Store the new anchorPointX value
+              auto anchorPointX = static_cast<double>(toValue);
+              LayerProperties::SetAnchorPointX(target, static_cast<float>(anchorPointX));
+
+              // Calculate and update the AnchorPoint transform
+              double destX = -target->Width * anchorPointX;
+              LayerProperties::GetAnchorTransform(target)->X = destX;
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return static_cast<double>(LayerProperties::GetAnchorPointX(target));
+          })) },
+    { "anchorPoint.y",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              // Zero out negative and null values
+              auto fromValue = from ? std::max<double>(0.0, static_cast<double>(from)) : 0.0;
+              auto toValue = to ? std::max<double>(0.0, static_cast<double>(to)) : 0.0;
+
+              // Calculate values to animate on the AnchorPoint transform
+              fromValue = -target->Height * fromValue;
+              toValue = -target->Height * toValue;
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetAnchorYTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from ? static_cast<Object^>(fromValue) : nullptr,
+                  toValue);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              // Store the new anchorPointY value
+              auto anchorPointY = static_cast<double>(toValue);
+              LayerProperties::SetAnchorPointY(target, static_cast<float>(anchorPointY));
+
+              // Calculate and update the AnchorPoint transform
+              double destY = -target->Height * anchorPointY;
+              LayerProperties::GetAnchorTransform(target)->Y = destY;
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return static_cast<double>(LayerProperties::GetAnchorPointY(target));
+          })) },
+    { "anchorPoint",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              s_animatableProperties["anchorPoint.x"]->AnimateValue(target,
+                                                               storyboard,
+                                                               properties,
+                                                               (from != nullptr) ? (Object^)((Point)from).X : nullptr,
+                                                               (double)((Point)to).X);
+              s_animatableProperties["anchorPoint.y"]->AnimateValue(target,
+                                                               storyboard,
+                                                               properties,
+                                                               (from != nullptr) ? (Object^)((Point)from).Y : nullptr,
+                                                               (double)((Point)to).Y);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerProperties::SetValue(target, "anchorPoint.x", static_cast<double>(static_cast<Point>(toValue).X));
+              LayerProperties::SetValue(target, "anchorPoint.y", static_cast<double>(static_cast<Point>(toValue).Y));
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              // Unbox x and y values as doubles, before casting them to floats
+              return Point(static_cast<float>(static_cast<double>(LayerProperties::GetValue(target, "anchorPoint.x"))),
+                           static_cast<float>(static_cast<double>(LayerProperties::GetValue(target, "anchorPoint.y"))));
+          })) },
+    { "size.width",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              // Zero out negative and null values
+              auto fromValue = from ? std::max<double>(0.0, static_cast<double>(from)) : 0.0;
+              auto toValue = to ? std::max<double>(0.0, static_cast<double>(to)) : 0.0;
+
+              // Calculate values to animate on the AnchorPoint transform
+              // TODO: SHOULD WE JUST ANIMATE THEM DIRECTLY RATHER THAN DUPLICATING THIS LOGIC, OR PULL OUT TO SHARED LOCATION?
+              float anchorPointX = LayerProperties::GetAnchorPointX(target);
+              fromValue = (-(fromValue) * anchorPointX);
+              toValue = (-(toValue) * anchorPointX);
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetAnchorXTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from ? static_cast<Object^>(fromValue) : nullptr,
+                  toValue);
+
+              ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+              // Animate the VisualWidth property to the new value
+              // TODO: Why is this necessary - is it only necessary to re-render every frame?
+              LayerProperties::AddAnimation("(LayerProperties.VisualWidth)", target, storyboard, properties, from, to, true);
+              ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              // Update our width
+              auto toWidth = std::max<double>(0.0, static_cast<double>(toValue));
+              target->Width = toWidth;
+
+              // Update the AnchorPoint transform
+              double destX = -(toWidth) * LayerProperties::GetAnchorPointX(target);
+              LayerProperties::GetAnchorTransform(target)->X = destX;
+
+              auto anchorX = LayerProperties::GetAnchorTransform(target)->X;
+              auto anchorY = LayerProperties::GetAnchorTransform(target)->Y;
+
+              ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+              // Update the VisualWidth property
+              // TODO: Why is this necessary - is it only necessary to re-render every frame?
+              LayerProperties::SetVisualWidth(target, toWidth);
+              ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+              // Update the Clip rect if necessary
+              if (target->Clip) {
+                  Rect clipRect = target->Clip->Rect;
+                  clipRect.Width = static_cast<float>(toWidth);
+                  target->Clip->Rect = clipRect;
+              }
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerProperties::GetVisualWidth(target);
+          })) },
+    { "size.height",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              // Zero out negative and null values
+              auto fromValue = from ? std::max<double>(0.0, static_cast<double>(from)) : 0.0;
+              auto toValue = to ? std::max<double>(0.0, static_cast<double>(to)) : 0.0;
+
+              // Calculate values to animate on the AnchorPoint transform
+              // TODO: SHOULD WE JUST ANIMATE THEM DIRECTLY RATHER THAN DUPLICATING THIS LOGIC, OR PULL OUT TO SHARED LOCATION?
+              float anchorPointY = LayerProperties::GetAnchorPointY(target);
+              fromValue = (-(fromValue) * anchorPointY);
+              toValue = (-(toValue) * anchorPointY);
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetAnchorYTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from ? static_cast<Object^>(fromValue) : nullptr,
+                  toValue);
+
+              //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+              // Animate the VisualHeight property to the new value
+              // TODO: Why is this necessary - is it only necessary to re-render every frame?
+              LayerProperties::AddAnimation("(LayerProperties.VisualHeight)", target, storyboard, properties, from, to, true);
+              //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              // Update our height
+              auto toHeight = std::max<double>(0.0, static_cast<double>(toValue));
+              target->Height = toHeight;
+
+              // Update the AnchorPoint transform
+              double destY = -(toHeight) * LayerProperties::GetAnchorPointY(target);
+              LayerProperties::GetAnchorTransform(target)->Y = destY;
+
+              //////////////////////////////////////////////////////////////////////////////////
+              // Update the VisualHeight property
+              // TODO: Why is this necessary - is it only necessary to re-render every frame?
+              LayerProperties::SetVisualHeight(target, toHeight);
+              //////////////////////////////////////////////////////////////////////////////////
+
+              // Update the Clip rect if necessary
+              if (target->Clip) {
+                  Rect clipRect = target->Clip->Rect;
+                  clipRect.Height = static_cast<float>(toHeight);
+                  target->Clip->Rect = clipRect;
+              }
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerProperties::GetVisualHeight(target);
+          })) },
+    { "size",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              s_animatableProperties["size.width"]->AnimateValue(target,
+                                                            storyboard,
+                                                            properties,
+                                                            (from != nullptr) ? (Object^)((Size)from).Width : nullptr,
+                                                            (double)((Size)to).Width);
+              s_animatableProperties["size.height"]->AnimateValue(target,
+                                                             storyboard,
+                                                             properties,
+                                                             (from != nullptr) ? (Object^)((Size)from).Height : nullptr,
+                                                             (double)((Size)to).Height);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              s_animatableProperties["size.width"]->SetValue(target, (double)((Size)toValue).Width);
+              s_animatableProperties["size.height"]->SetValue(target, (double)((Size)toValue).Height);
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              // Unbox width and height values as doubles, before casting them to floats
+              return Size((float)(double)LayerProperties::GetValue(target, "size.width"),
+                          (float)(double)LayerProperties::GetValue(target, "size.height"));
+          })) },
+    { "transform.rotation",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetRotationTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from,
+                  to);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerProperties::GetRotationTransform(target)->Angle = static_cast<double>(toValue);
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerProperties::GetRotationTransform(target)->Angle;
+          })) },
+    { "transform.scale.x",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetScaleXTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from,
+                  to);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerProperties::GetScaleTransform(target)->ScaleX = static_cast<double>(toValue);
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerProperties::GetScaleTransform(target)->ScaleX;
+          })) },
+    { "transform.scale.y",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetScaleYTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from,
+                  to);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerProperties::GetScaleTransform(target)->ScaleY = static_cast<double>(toValue);
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerProperties::GetScaleTransform(target)->ScaleY;
+          })) },
+    { "transform.translation.x",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetTranslationXTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from,
+                  to);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerProperties::GetTranslationTransform(target)->X = static_cast<double>(toValue);
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerProperties::GetTranslationTransform(target)->X;
+          })) },
+    { "transform.translation.y",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              LayerProperties::AddAnimation(
+                  LayerProperties::GetTranslationYTransformPath(),
+                  target,
+                  storyboard,
+                  properties,
+                  from,
+                  to);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerProperties::GetTranslationTransform(target)->Y = static_cast<double>(toValue);
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerProperties::GetTranslationTransform(target)->Y;
+          })) },
+    { "opacity",
+      ref new AnimatableProperty(
+          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              LayerProperties::AddAnimation("(UIElement.Opacity)", target, storyboard, properties, from, to);
+          }),
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              target->Opacity = static_cast<double>(toValue);
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ { 
+              return target->Opacity; 
+          })) },
+    { "gravity",
+      ref new AnimatableProperty(
+          nullptr,
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerProperties::SetContentGravity(target, static_cast<ContentGravity>(static_cast<int>(toValue)));
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ { 
+              return static_cast<int>(LayerProperties::GetContentGravity(target));
+          })) },
+    { "masksToBounds",
+      ref new AnimatableProperty(nullptr,
+          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              bool masksToBounds = static_cast<bool>(toValue);
+              if (masksToBounds) {
+                  // Set up our Clip geometry based on the visual/transformed width/height of the target
+                  // TODO: Why can't we just use Width/Height here??
+                  auto clipGeometry = ref new RectangleGeometry();
+                  clipGeometry->Rect = Rect(
+                      0, 
+                      0, 
+                      static_cast<float>(LayerProperties::GetVisualWidth(target)), 
+                      static_cast<float>(LayerProperties::GetVisualHeight(target)));
+
+                  // Set up its origin transform
+                  auto clipOriginTransform = ref new TranslateTransform();
+                  clipOriginTransform->X = LayerProperties::GetOriginX(target);
+                  clipOriginTransform->Y = LayerProperties::GetOriginY(target);
+                  clipGeometry->Transform = clipOriginTransform;
+
+                  target->Clip = clipGeometry;
+              } else {
+                  // Clear out the Clip geometry
+                  target->Clip = nullptr;
+              }
+          }),
+          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ { 
+              return target->Clip != nullptr; 
+          })) },
+};
+
+// CALayer property management plumbing
+bool LayerProperties::s_dependencyPropertiesRegistered = false;
+DependencyProperty^ LayerProperties::s_anchorPointProperty = nullptr;
+DependencyProperty^ LayerProperties::s_originProperty = nullptr;
+DependencyProperty^ LayerProperties::s_positionProperty = nullptr;
+DependencyProperty^ LayerProperties::s_visualWidthProperty = nullptr;
+DependencyProperty^ LayerProperties::s_visualHeightProperty = nullptr;
+DependencyProperty^ LayerProperties::s_contentGravityProperty = nullptr;
+DependencyProperty^ LayerProperties::s_contentCenterProperty = nullptr;
+DependencyProperty^ LayerProperties::s_contentSizeProperty = nullptr;
+
+void LayerProperties::InitializeFrameworkElement(FrameworkElement^ element) {
+    // No-op if already registered
+    _registerDependencyProperties();
+
+    // Make sure this FrameworkElement is hit-testable by default
+    element->IsHitTestVisible = true;
+
+    ////////////////////////////////////////////////////////////////
+    // Set up all necessary RenderTransforms for CALayer support.
+    // The order of transforms is critical.
+    ////////////////////////////////////////////////////////////////
+
+    // Grab Width/Height
+    // These likely won't be set yet, but if not, we'll use 0 until the layer is resized
+    auto width = (std::isnan(element->Width) ? 0.0 : element->Width);
+    auto height = (std::isnan(element->Height) ? 0.0 : element->Height);
+
+    // The anchor value modifies how the rest of the transforms are applied to this layer
+    // Ideally we'd just set UIElement::RenderTransformOrigin, but that doesn't apply to TranslateTransforms
+    auto sizeAnchorTransform = ref new TranslateTransform(); // anchorpoint
+    sizeAnchorTransform->X = -width * GetAnchorPointX(element);
+    sizeAnchorTransform->Y = -height * GetAnchorPointY(element);
+
+    // Set up the origin transform
+    /////////////////////////////////////////////////////////////////////////////////////////
+    // TODO: Curious - why are these negative yet the clip geometry is positive?
+    /////////////////////////////////////////////////////////////////////////////////////////
+    auto originTransform = ref new TranslateTransform(); // origin
+    originTransform->X = -GetOriginX(element);
+    originTransform->Y = -GetOriginY(element);
+
+    // Nested transform group for rotation, scale and translation transforms
+    auto contentTransform = ref new TransformGroup();
+    contentTransform->Children->Append(ref new RotateTransform()); // transform.rotation
+    contentTransform->Children->Append(ref new ScaleTransform()); // transform.scale
+    contentTransform->Children->Append(ref new TranslateTransform()); // transform.translation
+
+    // Positioning transform
+    auto positionTransform = ref new TranslateTransform(); // position
+    positionTransform->X = GetPositionX(element);
+    positionTransform->Y = GetPositionY(element);
+
+    auto layerTransforms = ref new TransformGroup();
+    layerTransforms->Children->Append(sizeAnchorTransform);
+    layerTransforms->Children->Append(originTransform);
+    layerTransforms->Children->Append(contentTransform);
+    layerTransforms->Children->Append(positionTransform);
+    element->RenderTransform = layerTransforms;
+
+    SetVisualWidth(element, width);
+    SetVisualHeight(element, height);
 }
 
-CATextLayerXaml^ CATextLayerXaml::CreateTextLayer() {
-    ICacheableObject^ ret = _TextLayerCache->GetCachableObject();
-    if (ret != nullptr) {
-        return (CATextLayerXaml^)ret;
+// CALayer property managment support
+void LayerProperties::SetValue(FrameworkElement^ element, String^ propertyName, Object^ value) {
+    s_animatableProperties[propertyName]->SetValue(element, value);
+}
+
+Object^ LayerProperties::GetValue(FrameworkElement^ element, String^ propertyName) {
+    return s_animatableProperties[propertyName]->GetValue(element);
+}
+
+void LayerProperties::AnimateValue(
+    FrameworkElement^ target,
+    Storyboard^ storyboard,
+    DoubleAnimation^ timeline,
+    String^ propertyName,
+    Object^ fromValue,
+    Object^ toValue) {
+    s_animatableProperties[propertyName]->AnimateValue(target, storyboard, timeline, fromValue, toValue);
+}
+
+// CALayer content support
+void LayerProperties::SetContent(FrameworkElement^ element, ImageSource^ source, float width, float height, float scale) {
+    // Get content 
+    auto contentImage = _GetContentImage(element, true /* createIfPossible */);
+    if (!contentImage) {
+        return;
     }
 
-    return ref new CATextLayerXaml();
+    // Apply content source
+    contentImage->Source = source;
+
+    // Store content size
+    _SetContentSize(element, Size(width, height));
+
+    // Apply scale
+    // TODOTODOTODO:
+
+    // Refresh any content center settings
+    _ApplyContentCenter(element, _GetContentCenter(element));
+
+    // Refresh any content gravity settings
+    _ApplyContentGravity(element, GetContentGravity(element));
 }
 
-void CATextLayerXaml::DestroyTextLayer(CATextLayerXaml^ content) {
-    _TextLayerCache->PushCacheableObject(content);
+Image^ LayerProperties::_GetContentImage(FrameworkElement^ element, bool createIfPossible) {
+    // First check if the element implements ILayer
+    Image^ contentImage;
+    ILayer^ layerElement = dynamic_cast<ILayer^>(element);
+    if (layerElement) {
+        // Accessing the LayerContent will create it on-demand, so only do so if necessary
+        if (layerElement->HasLayerContent || createIfPossible) {
+            contentImage = layerElement->LayerContent;
+        }
+    } else {
+        // Not an ILayer, so default to grabbing the xamlElement's LayerContentProperty (if it exists)
+        contentImage = dynamic_cast<Image^>(element->GetValue(Layer::LayerContentProperty));
+    }
+
+    if (!contentImage) {
+        UNIMPLEMENTED_WITH_MSG(
+            "Layer Content not supported on this Xaml element: [%ws].",
+            element->GetType()->FullName->Data());
+    }
+
+    return contentImage;
 }
 
-} // Controls
-} // XamlCompositor
+void LayerProperties::SetContentCenter(FrameworkElement^ element, Windows::Foundation::Rect rect) {
+    element->SetValue(s_contentCenterProperty, rect);
+    _ApplyContentCenter(element, rect);
+}
+
+Rect LayerProperties::_GetContentCenter(FrameworkElement^ element) {
+    return static_cast<Rect>(element->GetValue(s_contentCenterProperty));
+}
+
+void LayerProperties::_ApplyContentCenter(FrameworkElement^ element, Rect contentCenter) {
+    // Nothing to do if we don't have any content
+    Image^ image = _GetContentImage(element);
+    if (!image || !image->Source ) {
+        return;
+    }
+
+    ContentGravity gravity = GetContentGravity(element);
+    Size contentSize = _GetContentSize(element);
+    if (contentCenter.Equals(Rect(0, 0, 1.0, 1.0))) {
+        image->NineGrid = Thickness(0, 0, 0, 0);
+    } else {
+        int left = static_cast<int>(contentCenter.X * contentSize.Width);
+        int top = static_cast<int>(contentCenter.Y * contentSize.Height);
+        int right = (static_cast<int>(contentSize.Width) - (left + (static_cast<int>(contentCenter.Width * contentSize.Width))));
+        int bottom = (static_cast<int>(contentSize.Height) - (top + (static_cast<int>(contentCenter.Height * contentSize.Height))));
+
+        // Remove edge cases that contentsCenter supports but NineGrid does not. 1/3 for top 1/3 for bottom 1/3 for
+        // the center etc..
+        left = std::max<int>(0, left);
+        top = std::max<int>(0, top);
+        right = std::max<int>(0, right);
+        bottom = std::max<int>(0, bottom);
+
+        // Cap the left/right to the maximum width
+        int maxWidth = static_cast<int>(contentSize.Width / 3);
+        left = std::min<int>(left, maxWidth);
+        right = std::min<int>(right, maxWidth);
+
+        // Cap the top/bottom to the maximum height
+        int maxHeight = static_cast<int>(contentSize.Height / 3);
+        top = std::min<int>(top, maxHeight);
+        bottom = std::min<int>(bottom, maxHeight);
+
+        // Set the image's NineGrid to accomodate
+        image->NineGrid = Thickness(left, top, right, bottom);
+    }
+}
+
+// CALayer border support
+// TODO: Add border support
+
+///////////////////////////////////////////////////////////////////////////////////
+// TODO: EVERYTHING BELOW SHOULD/CAN PROB GO INTO A .CPP FILE AS A HELPER REF CLASS
+
+void LayerProperties::_registerDependencyProperties() {
+    if (!s_dependencyPropertiesRegistered) {
+
+        // AnchorPoint always starts at Point(0.5, 0.5)
+        s_anchorPointProperty = DependencyProperty::RegisterAttached(
+            "AnchorPoint",
+            Point::typeid,
+            FrameworkElement::typeid,
+            ref new PropertyMetadata(Point(0.5, 0.5), nullptr));
+
+        s_originProperty = DependencyProperty::RegisterAttached(
+            "Origin",
+            Point::typeid,
+            FrameworkElement::typeid,
+            ref new PropertyMetadata(Point(0.0, 0.0), nullptr));
+
+        s_positionProperty = DependencyProperty::RegisterAttached(
+            "Position",
+            Point::typeid,
+            FrameworkElement::typeid,
+            ref new PropertyMetadata(Point(0.0, 0.0), nullptr));
+
+        s_visualWidthProperty = DependencyProperty::RegisterAttached(
+            "VisualWidth",
+            double::typeid,
+            FrameworkElement::typeid,
+            ref new PropertyMetadata(0.0,
+            ref new PropertyChangedCallback(&LayerProperties::_sizeChangedCallback)));
+
+        s_visualHeightProperty = DependencyProperty::RegisterAttached(
+            "VisualHeight",
+            double::typeid,
+            FrameworkElement::typeid,
+            ref new PropertyMetadata(0.0,
+            ref new PropertyChangedCallback(&LayerProperties::_sizeChangedCallback)));
+
+        s_contentGravityProperty = DependencyProperty::RegisterAttached(
+            "ContentGravity",
+            ContentGravity::typeid,
+            FrameworkElement::typeid,
+            ref new PropertyMetadata(ContentGravity::Resize, nullptr));
+
+        s_contentCenterProperty = DependencyProperty::RegisterAttached(
+            "ContentCenter",
+            Windows::Foundation::Rect::typeid,
+            FrameworkElement::typeid,
+            ref new PropertyMetadata(Windows::Foundation::Rect(0, 0, 1.0, 1.0), nullptr));
+
+        s_contentSizeProperty = DependencyProperty::RegisterAttached(
+            "ContentSize",
+            Windows::Foundation::Size::typeid,
+            FrameworkElement::typeid,
+            ref new PropertyMetadata(Windows::Foundation::Size(0, 0), nullptr));
+
+        s_dependencyPropertiesRegistered = true;
+    }
+}
+
+// AnchorPoint
+DependencyProperty^ LayerProperties::AnchorPointProperty::get() {
+    return s_anchorPointProperty;
+}
+
+float LayerProperties::GetAnchorPointX(FrameworkElement^ element) {
+    return static_cast<Point>(element->GetValue(s_anchorPointProperty)).X;
+}
+
+void LayerProperties::SetAnchorPointX(FrameworkElement^ element, float value) {
+    if (DEBUG_ANCHORPOINT) {
+        TraceVerbose(TAG, L"SetAnchorPointX [%ws:%f]", element->GetType()->FullName->Data(), value);
+    }
+
+    auto point = static_cast<Point>(element->GetValue(s_anchorPointProperty));
+    point.X = value;
+    element->SetValue(s_anchorPointProperty, point);
+}
+
+float LayerProperties::GetAnchorPointY(FrameworkElement^ element) {
+    return static_cast<Point>(element->GetValue(s_anchorPointProperty)).Y;
+}
+
+void LayerProperties::SetAnchorPointY(FrameworkElement^ element, float value) {
+    if (DEBUG_ANCHORPOINT) {
+        TraceVerbose(TAG, L"SetAnchorPointY [%ws:%f]", element->GetType()->FullName->Data(), value);
+    }
+
+    auto point = static_cast<Point>(element->GetValue(s_anchorPointProperty));
+    point.Y = value;
+    element->SetValue(s_anchorPointProperty, point);
+}
+
+TranslateTransform^ LayerProperties::GetAnchorTransform(FrameworkElement^ element) {
+    return safe_cast<TranslateTransform^>(safe_cast<TransformGroup^>(element->RenderTransform)->Children->GetAt(0));
+}
+
+String^ LayerProperties::GetAnchorXTransformPath() {
+    static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[0].(TranslateTransform.X)";
+    return path;
+}
+
+String^ LayerProperties::GetAnchorYTransformPath() {
+    static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[0].(TranslateTransform.Y)";
+    return path;
+}
+
+// Origin
+DependencyProperty^ LayerProperties::OriginProperty::get() {
+    return s_originProperty;
+}
+
+float LayerProperties::GetOriginX(FrameworkElement^ element) {
+    return static_cast<Point>(element->GetValue(s_originProperty)).X;
+}
+
+void LayerProperties::SetOriginX(FrameworkElement^ element, float value) {
+    auto point = static_cast<Point>(element->GetValue(s_originProperty));
+    point.X = value;
+    element->SetValue(s_originProperty, point);
+}
+
+float LayerProperties::GetOriginY(FrameworkElement^ element) {
+    return static_cast<Point>(element->GetValue(s_originProperty)).Y;
+}
+
+void LayerProperties::SetOriginY(FrameworkElement^ element, float value) {
+    auto point = static_cast<Point>(element->GetValue(s_originProperty));
+    point.Y = value;
+    element->SetValue(s_originProperty, point);
+}
+
+TranslateTransform^ LayerProperties::GetOriginTransform(FrameworkElement^ element) {
+    return safe_cast<TranslateTransform^>(safe_cast<TransformGroup^>(element->RenderTransform)->Children->GetAt(1));
+}
+
+String^ LayerProperties::GetOriginXTransformPath() {
+    static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)";
+    return path;
+}
+
+String^ LayerProperties::GetOriginYTransformPath() {
+    static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)";
+    return path;
+}
+
+// Position
+DependencyProperty^ LayerProperties::PositionProperty::get() {
+    return s_positionProperty;
+}
+
+float LayerProperties::GetPositionX(FrameworkElement^ element) {
+    return static_cast<Point>(element->GetValue(s_positionProperty)).X;
+}
+
+void LayerProperties::SetPositionX(FrameworkElement^ element, float value) {
+    if (DEBUG_POSITION) {
+        TraceVerbose(TAG, L"SetPositionX [%ws:%f]", element->GetType()->FullName->Data(), value);
+    }
+
+    auto point = static_cast<Point>(element->GetValue(s_positionProperty));
+    point.X = value;
+    element->SetValue(s_positionProperty, point);
+}
+
+float LayerProperties::GetPositionY(FrameworkElement^ element) {
+    return static_cast<Point>(element->GetValue(s_positionProperty)).Y;
+}
+
+void LayerProperties::SetPositionY(FrameworkElement^ element, float value) {
+    if (DEBUG_POSITION) {
+        TraceVerbose(TAG, L"SetPositionY [%ws:%f]", element->GetType()->FullName->Data(), value);
+    }
+
+    auto point = static_cast<Point>(element->GetValue(s_positionProperty));
+    point.Y = value;
+    element->SetValue(s_positionProperty, point);
+}
+
+TranslateTransform^ LayerProperties::GetPositionTransform(FrameworkElement^ element) {
+    return safe_cast<TranslateTransform^>(safe_cast<TransformGroup^>(element->RenderTransform)->Children->GetAt(3));
+}
+
+String^ LayerProperties::GetPositionXTransformPath() {
+    static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[3].(TranslateTransform.X)";
+    return path;
+}
+
+String^ LayerProperties::GetPositionYTransformPath() {
+    static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[3].(TranslateTransform.Y)";
+    return path;
+}
+
+// Rotation
+RotateTransform^ LayerProperties::GetRotationTransform(FrameworkElement^ element) {
+    return safe_cast<RotateTransform^>(
+        safe_cast<TransformGroup^>(
+            safe_cast<TransformGroup^>(element->RenderTransform)->Children->GetAt(2))->Children->GetAt(0));
+}
+
+String^ LayerProperties::GetRotationTransformPath() {
+    static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[0].(RotateTransform.Angle)";
+    return path;
+}
+
+// Scale
+ScaleTransform^ LayerProperties::GetScaleTransform(FrameworkElement^ element) {
+    return safe_cast<ScaleTransform^>(
+        safe_cast<TransformGroup^>(
+            safe_cast<TransformGroup^>(element->RenderTransform)->Children->GetAt(2))->Children->GetAt(1));
+}
+
+String^ LayerProperties::GetScaleXTransformPath() {
+    static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[1].(ScaleTransform.ScaleX)";
+    return path;
+}
+
+String^ LayerProperties::GetScaleYTransformPath() {
+    static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[1].(ScaleTransform.ScaleY)";
+    return path;
+}
+
+// Translation
+TranslateTransform^ LayerProperties::GetTranslationTransform(FrameworkElement^ element) {
+    return safe_cast<TranslateTransform^>(
+        safe_cast<TransformGroup^>(
+            safe_cast<TransformGroup^>(element->RenderTransform)->Children->GetAt(2))->Children->GetAt(2));
+}
+
+String^ LayerProperties::GetTranslationXTransformPath() {
+    static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[2].(TranslateTransform.X)";
+    return path;
+}
+
+String^ LayerProperties::GetTranslationYTransformPath() {
+    static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[2].(TranslateTransform.Y)";
+    return path;
+}
+
+// VisualWidth
+DependencyProperty^ LayerProperties::VisualWidthProperty::get() {
+    return s_visualWidthProperty;
+}
+
+double LayerProperties::GetVisualWidth(FrameworkElement^ element) {
+    return static_cast<double>(element->GetValue(s_visualWidthProperty));
+}
+
+void LayerProperties::SetVisualWidth(FrameworkElement^ element, double value) {
+    element->SetValue(s_visualWidthProperty, value);
+}
+
+// VisualHeight
+DependencyProperty^ LayerProperties::VisualHeightProperty::get() {
+    return s_visualHeightProperty;
+}
+
+double LayerProperties::GetVisualHeight(FrameworkElement^ element) {
+    return static_cast<double>(element->GetValue(s_visualHeightProperty));
+}
+
+void LayerProperties::SetVisualHeight(FrameworkElement^ element, double value) {
+    element->SetValue(s_visualHeightProperty, value);
+}
+
+void LayerProperties::_sizeChangedCallback(DependencyObject^ sender, DependencyPropertyChangedEventArgs^ args) {
+    //////////////////////////////////////////////////////////////////////////////////////////////
+    // TODO: Revisit whether or not we actually need this - it can't be very performant...?
+    safe_cast<FrameworkElement^>(sender)->InvalidateArrange();
+    //////////////////////////////////////////////////////////////////////////////////////////////
+}
+
+// ContentGravity
+DependencyProperty^ LayerProperties::ContentGravityProperty::get() {
+    return s_contentGravityProperty;
+}
+
+ContentGravity LayerProperties::GetContentGravity(FrameworkElement^ element) {
+    return static_cast<ContentGravity>(element->GetValue(s_contentGravityProperty));
+}
+
+void LayerProperties::SetContentGravity(FrameworkElement^ element, ContentGravity value) {
+    element->SetValue(s_contentGravityProperty, value);
+    _ApplyContentGravity(element, value);
+}
+
+void LayerProperties::_ApplyContentGravity(FrameworkElement^ element, ContentGravity gravity) {
+    // Calculate aspect ratio
+    Size contentSize = _GetContentSize(element);
+    double widthAspect = element->Width / contentSize.Width;
+    double heightAspect = element->Height / contentSize.Height;
+    double minAspect = std::min<double>(widthAspect, heightAspect);
+    double maxAspect = std::max<double>(widthAspect, heightAspect);
+
+    // Apply gravity mapping
+    ////////////////////////////////////////////////////
+    float scale = 1.0; // TODO: GET SCALE SETTING
+    ////////////////////////////////////////////////////
+    HorizontalAlignment horizontalAlignment;
+    VerticalAlignment verticalAlignment;
+    double contentWidth = 0.0;
+    double contentHeight = 0.0;
+    switch (gravity) {
+    case ContentGravity::Center:
+        horizontalAlignment = HorizontalAlignment::Center;
+        verticalAlignment = VerticalAlignment::Center;
+        contentWidth = contentSize.Width * scale;
+        contentHeight = contentSize.Height * scale;
+        break;
+
+    case ContentGravity::Top:
+        horizontalAlignment = HorizontalAlignment::Center;
+        verticalAlignment = VerticalAlignment::Top;
+        contentWidth = contentSize.Width * scale;
+        contentHeight = contentSize.Height * scale;
+        break;
+
+    case ContentGravity::Bottom:
+        horizontalAlignment = HorizontalAlignment::Center;
+        verticalAlignment = VerticalAlignment::Bottom;
+        contentWidth = contentSize.Width * scale;
+        contentHeight = contentSize.Height * scale;
+        break;
+
+    case ContentGravity::Left:
+        horizontalAlignment = HorizontalAlignment::Left;
+        verticalAlignment = VerticalAlignment::Center;
+        contentWidth = contentSize.Width * scale;
+        contentHeight = contentSize.Height * scale;
+        break;
+
+    case ContentGravity::Right:
+        horizontalAlignment = HorizontalAlignment::Right;
+        verticalAlignment = VerticalAlignment::Center;
+        contentWidth = contentSize.Width * scale;
+        contentHeight = contentSize.Height * scale;
+        break;
+
+    case ContentGravity::TopLeft:
+        horizontalAlignment = HorizontalAlignment::Left;
+        verticalAlignment = VerticalAlignment::Top;
+        contentWidth = contentSize.Width * scale;
+        contentHeight = contentSize.Height * scale;
+        break;
+
+    case ContentGravity::TopRight:
+        horizontalAlignment = HorizontalAlignment::Right;
+        verticalAlignment = VerticalAlignment::Top;
+        contentWidth = contentSize.Width * scale;
+        contentHeight = contentSize.Height * scale;
+        break;
+
+    case ContentGravity::BottomLeft:
+        horizontalAlignment = HorizontalAlignment::Left;
+        verticalAlignment = VerticalAlignment::Bottom;
+        contentWidth = contentSize.Width * scale;
+        contentHeight = contentSize.Height * scale;
+        break;
+
+    case ContentGravity::BottomRight:
+        horizontalAlignment = HorizontalAlignment::Right;
+        verticalAlignment = VerticalAlignment::Bottom;
+        contentWidth = contentSize.Width * scale;
+        contentHeight = contentSize.Height * scale;
+        break;
+
+    case ContentGravity::Resize:
+        // UIViewContentModeScaleToFil;
+        horizontalAlignment = HorizontalAlignment::Left;
+        verticalAlignment = VerticalAlignment::Top;
+        contentWidth = element->Width * scale;
+        contentHeight = element->Height * scale;
+        break;
+
+    // UIViewContentModeScaleAspectFit
+    case ContentGravity::ResizeAspect:
+        // Center the image
+        horizontalAlignment = HorizontalAlignment::Center;
+        verticalAlignment = VerticalAlignment::Center;
+
+        // Scale the image with the smaller aspect.
+        contentWidth = contentSize.Width * static_cast<float>(minAspect) * scale;
+        contentHeight = contentSize.Height * static_cast<float>(minAspect) * scale;
+        break;
+
+    // UIViewContentModeScaleAspectFill
+    case ContentGravity::ResizeAspectFill:
+        // Center the image
+        horizontalAlignment = HorizontalAlignment::Center;
+        verticalAlignment = VerticalAlignment::Center;
+
+        // Scale the image with the larger aspect.
+        contentWidth = contentSize.Width * static_cast<float>(maxAspect);
+        contentHeight = contentSize.Height * static_cast<float>(maxAspect);
+        break;
+    }
+
+    // Do we have content?
+    Image^ image = _GetContentImage(element);
+    if (image) {
+        // Using Fill since we calculate the aspect/size ourselves
+        image->Stretch = Stretch::Fill;
+
+        // Only resize the content image if we have one
+        image->Width = contentWidth;
+        image->Height = contentHeight;
+    }
+
+    // If we don't have content, apply the gravity alignment directly to the target FrameworkElement,
+    // otherwise apply it to the content image
+    FrameworkElement^ gravityElement = image ? image : element;
+    gravityElement->HorizontalAlignment = horizontalAlignment;
+    gravityElement->VerticalAlignment = verticalAlignment;
+}
+
+// ContentSize
+DependencyProperty^ LayerProperties::ContentSizeProperty::get() {
+    return s_contentSizeProperty;
+}
+
+Size LayerProperties::_GetContentSize(FrameworkElement^ element) {
+    return static_cast<Size>(element->GetValue(s_contentSizeProperty));
+}
+
+void LayerProperties::_SetContentSize(Windows::UI::Xaml::FrameworkElement^ element, Size value) {
+    element->SetValue(s_contentSizeProperty, value);
+}
+
+void LayerProperties::AddAnimation(Platform::String^ propertyName,
+                                   FrameworkElement^ target,
+                                   Media::Animation::Storyboard^ storyboard,
+                                   Media::Animation::DoubleAnimation^ copyProperties,
+                                   Platform::Object^ fromValue,
+                                   Platform::Object^ toValue,
+                                   bool dependent) {
+    DoubleAnimation^ posxAnim = ref new DoubleAnimation();
+    if (toValue) {
+        posxAnim->To = static_cast<double>(toValue);
+    }
+
+    if (fromValue) {
+        posxAnim->From = static_cast<double>(fromValue);
+    }
+
+    posxAnim->Duration = copyProperties->Duration;
+    posxAnim->RepeatBehavior = copyProperties->RepeatBehavior;
+    posxAnim->AutoReverse = copyProperties->AutoReverse;
+    posxAnim->EasingFunction = copyProperties->EasingFunction;
+    posxAnim->EnableDependentAnimation = dependent;
+    posxAnim->FillBehavior = copyProperties->FillBehavior;
+    posxAnim->BeginTime = copyProperties->BeginTime;
+    storyboard->Children->Append(posxAnim);
+
+    Storyboard::SetTarget(posxAnim, target);
+    Storyboard::SetTargetProperty(posxAnim, propertyName);
+}
+
+}
 
 // clang-format on
