@@ -33,6 +33,7 @@ struct CAMediaTimingProperties;
 
 class CACompositorInterface {
 public:
+    // Compositor APIs
     virtual bool IsRunningAsFramework() = 0;
 
     // CATransaction support
@@ -42,35 +43,35 @@ public:
     virtual void ProcessTransactions() = 0;
 
     // DisplayNode creation
-    virtual DisplayNode* CreateDisplayNode(const Microsoft::WRL::ComPtr<IInspectable>& xamlElement) = 0;
+    virtual std::shared_ptr<DisplayNode> CreateDisplayNode(const Microsoft::WRL::ComPtr<IInspectable>& xamlElement) = 0;
 
-    virtual Microsoft::WRL::ComPtr<IInspectable> GetXamlLayoutElement(DisplayNode*) = 0;
+    virtual Microsoft::WRL::ComPtr<IInspectable> GetXamlLayoutElement(const std::shared_ptr<DisplayNode>&) = 0;
 
     // DisplayNode Sublayer management
     virtual void addNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                         DisplayNode* node,
-                         DisplayNode* superNode,
-                         DisplayNode* beforeNode,
-                         DisplayNode* afterNode) = 0;
+                         const std::shared_ptr<DisplayNode>& node,
+                         const std::shared_ptr<DisplayNode>& superNode,
+                         const std::shared_ptr<DisplayNode>& beforeNode,
+                         const std::shared_ptr<DisplayNode>& afterNode) = 0;
     virtual void moveNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                          DisplayNode* node,
-                          DisplayNode* beforeNode,
-                          DisplayNode* afterNode) = 0;
-    virtual void removeNode(const std::shared_ptr<DisplayTransaction>& transaction, DisplayNode* node) = 0;
+                          const std::shared_ptr<DisplayNode>& node,
+                          const std::shared_ptr<DisplayNode>& beforeNode,
+                          const std::shared_ptr<DisplayNode>& afterNode) = 0;
+    virtual void removeNode(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<DisplayNode>& node) = 0;
 
     // DisplayNode layer display properties
     virtual void setDisplayProperty(const std::shared_ptr<DisplayTransaction>& transaction,
-                                    DisplayNode* node,
+                                    const std::shared_ptr<DisplayNode>& node,
                                     const char* propertyName,
                                     NSObject* newValue) = 0;
     virtual void setNodeTexture(const std::shared_ptr<DisplayTransaction>& transaction,
-                                DisplayNode* node,
+                                const std::shared_ptr<DisplayNode>& node,
                                 DisplayTexture* newTexture,
                                 CGSize contentsSize,
                                 float contentsScale) = 0;
-    virtual NSObject* getDisplayProperty(DisplayNode* node, const char* propertyName = NULL) = 0;
-    virtual void setNodeTopMost(DisplayNode* node, bool topMost) = 0;
-    virtual void SetShouldRasterize(DisplayNode* node, bool rasterize) = 0;
+    virtual NSObject* getDisplayProperty(const std::shared_ptr<DisplayNode>& node, const char* propertyName = NULL) = 0;
+    virtual void setNodeTopMost(const std::shared_ptr<DisplayNode>& node, bool topMost) = 0;
+    virtual void SetShouldRasterize(const std::shared_ptr<DisplayNode>& node, bool rasterize) = 0;
 
     // DisplayTextures
     virtual DisplayTexture* GetDisplayTextureForCGImage(CGImageRef img, bool create) = 0;
@@ -92,7 +93,7 @@ public:
                                                        CAMediaTimingProperties* timingProperties) = 0;
     virtual DisplayAnimation* GetMoveDisplayAnimation(DisplayAnimation** secondAnimRet,
                                                       id caanim,
-                                                      DisplayNode* animNode,
+                                                      const std::shared_ptr<DisplayNode>& animNode,
                                                       NSString* type,
                                                       NSString* subtype,
                                                       CAMediaTimingProperties* timingProperties) = 0;
@@ -100,8 +101,6 @@ public:
     ////////////////////////////////////////////////////////////////////////
     // TODO: Switch to shared_ptr for alla these
     virtual void ReleaseAnimation(DisplayAnimation* animation) = 0;
-
-    virtual void ReleaseNode(DisplayNode* node) = 0;
 
     virtual void RetainDisplayTexture(DisplayTexture* tex) = 0;
     virtual void ReleaseDisplayTexture(DisplayTexture* tex) = 0;

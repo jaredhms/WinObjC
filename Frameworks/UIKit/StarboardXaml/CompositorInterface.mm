@@ -320,7 +320,7 @@ public:
         [_subType release];
     }
 
-    concurrency::task<void> AddToNode(DisplayNode* node) {
+    concurrency::task<void> AddToNode(DisplayNode& node) {
         CreateXamlAnimation();
         return AddTransitionAnimation(node, [_type UTF8String], [_subType UTF8String]);
     }
@@ -718,7 +718,7 @@ public:
         [_byValue release];
     }
 
-    concurrency::task<void> AddToNode(DisplayNode* node) {
+    concurrency::task<void> AddToNode(DisplayNode& node) {
         CreateXamlAnimation();
 
         const char* propName = [_propertyName UTF8String];
@@ -828,7 +828,7 @@ public:
 
 concurrency::task<void> DisplayNode::AddAnimation(DisplayAnimation* anim) {
     if (anim) {
-        return anim->AddToNode(this);
+        return anim->AddToNode(*this);
     }
 
     return concurrency::task_from_result();
@@ -1028,7 +1028,7 @@ public:
                 [_animation animationHasStarted];
 
                 if (newAnimation) {
-                    DisplayNode* node = (DisplayNode*)[_layer _presentationNode];
+                    std::shared_ptr<DisplayNode> node = [_layer _presentationNode];
                     return node->AddAnimation(newAnimation);
                 } else {
                     [_animation animationDidStop:FALSE];
@@ -1042,7 +1042,7 @@ public:
 
 class QueuedProperty : public ICompositorTransaction {
 public:
-    DisplayNodeRef _node;
+    std::shared_ptr<DisplayNode> _node;
     char* _propertyName;
     NSObject* _propertyValue;
     DisplayTextureRef _newTexture;
@@ -1050,7 +1050,7 @@ public:
     float _contentsScale;
     bool _applyingTexture;
 
-    QueuedProperty(DisplayNode* node, DisplayTexture* newTexture, CGSize contentsSize, float contentsScale) {
+    QueuedProperty(const std::shared_ptr<DisplayNode>& node, DisplayTexture* newTexture, CGSize contentsSize, float contentsScale) {
         _node = node;
         _propertyName = IwStrDup("contents");
         _propertyValue = NULL;
@@ -1060,7 +1060,7 @@ public:
         _applyingTexture = true;
     }
 
-    QueuedProperty(DisplayNode* node, const char* propertyName, NSObject* propertyValue) {
+    QueuedProperty(const std::shared_ptr<DisplayNode>& node, const char* propertyName, NSObject* propertyValue) {
         _node = node;
         _propertyName = IwStrDup(propertyName);
         _propertyValue = [propertyValue retain];
@@ -1089,15 +1089,15 @@ public:
 
 class QueuedNodeMovement : public ICompositorTransaction {
 public:
-    DisplayNodeRef _node;
-    DisplayNodeRef _before, _after;
-    DisplayNodeRef _supernode;
+    std::shared_ptr<DisplayNode> _node;
+    std::shared_ptr<DisplayNode> _before, _after;
+    std::shared_ptr<DisplayNode> _supernode;
 
     enum MovementType { Add, Move, Remove };
 
     MovementType _type;
 
-    QueuedNodeMovement(MovementType type, DisplayNode* node, DisplayNode* before, DisplayNode* after, DisplayNode* supernode) {
+    QueuedNodeMovement(MovementType type, const std::shared_ptr<DisplayNode>& node, const std::shared_ptr<DisplayNode>& before, const std::shared_ptr<DisplayNode>& after, const std::shared_ptr<DisplayNode>& supernode) {
         _type = type;
         _node = node;
         _before = before;
@@ -1111,12 +1111,12 @@ public:
                 if (!_supernode) {
                     _node->AddToRoot();
                 } else {
-                    _supernode->AddSubnode(_node.Get(), _before.Get(), _after.Get());
+                    _supernode->AddSubnode(_node, _before, _after);
                 }
                 break;
 
             case Move:
-                _node->MoveNode(_before.Get(), _after.Get());
+                _node->MoveNode(_before, _after);
                 break;
 
             case Remove:
@@ -1131,12 +1131,12 @@ using namespace std;
 class DisplayTransaction : public ICompositorTransaction {
     std::deque<std::shared_ptr<ICompositorTransaction>> _queuedTransactions;
     std::deque<std::shared_ptr<ICompositorAnimationTransaction>> _queuedAnimations;
-    std::map<DisplayNode*, std::map<std::string, std::shared_ptr<ICompositorTransaction>>> _queuedProperties;
+    std::map<std::shared_ptr<DisplayNode>, std::map<std::string, std::shared_ptr<ICompositorTransaction>>> _queuedProperties;
     std::deque<std::shared_ptr<ICompositorTransaction>> _queuedNodeMovements;
 
 public:
     void QueueProperty(const std::shared_ptr<QueuedProperty> property) {
-        auto& currentUpdates = _queuedProperties[property->_node.Get()];
+        auto& currentUpdates = _queuedProperties[property->_node];
         currentUpdates[property->_propertyName] = property;
     }
 
@@ -1174,13 +1174,13 @@ deque<std::shared_ptr<DisplayTransaction>> s_queuedTransactions;
 
 class CAXamlCompositor : public CACompositorInterface {
 public:
-    virtual DisplayNode* CreateDisplayNode(const ComPtr<IInspectable>& xamlElement) override {
-        return new DisplayNode(xamlElement.Get());
+    virtual std::shared_ptr<DisplayNode> CreateDisplayNode(const ComPtr<IInspectable>& xamlElement) override {
+        return std::make_shared<DisplayNode>(xamlElement.Get());
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // TODO: WE SHOULDN'T NEED THIS ANYMORE, BUT IF WE DO, MOVE IT TO DISPLAYNODE AND JUST CALL IT GETXAMLELEMENT
-    virtual ComPtr<IInspectable> GetXamlLayoutElement(DisplayNode* displayNode) override {
+    virtual ComPtr<IInspectable> GetXamlLayoutElement(const std::shared_ptr<DisplayNode>& displayNode) override {
         return displayNode->_xamlElement;
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1199,23 +1199,23 @@ public:
     }
 
     virtual void addNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                         DisplayNode* node,
-                         DisplayNode* superNode,
-                         DisplayNode* beforeNode,
-                         DisplayNode* afterNode) override {
+                         const std::shared_ptr<DisplayNode>& node,
+                         const std::shared_ptr<DisplayNode>& superNode,
+                         const std::shared_ptr<DisplayNode>& beforeNode,
+                         const std::shared_ptr<DisplayNode>& afterNode) override {
         transaction->QueueNodeMovement(
             std::make_shared<QueuedNodeMovement>(QueuedNodeMovement::Add, node, beforeNode, afterNode, superNode));
     }
 
     virtual void moveNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                          DisplayNode* node,
-                          DisplayNode* beforeNode,
-                          DisplayNode* afterNode) override {
+                          const std::shared_ptr<DisplayNode>& node,
+                          const std::shared_ptr<DisplayNode>& beforeNode,
+                          const std::shared_ptr<DisplayNode>& afterNode) override {
         transaction->QueueNodeMovement(
             std::make_shared<QueuedNodeMovement>(QueuedNodeMovement::Move, node, beforeNode, afterNode, nullptr));
     }
 
-    virtual void removeNode(const std::shared_ptr<DisplayTransaction>& transaction, DisplayNode* node) override {
+    virtual void removeNode(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<DisplayNode>& node) override {
         transaction->QueueNodeMovement(std::make_shared<QueuedNodeMovement>(QueuedNodeMovement::Remove, node, nullptr, nullptr, nullptr));
     }
 
@@ -1224,7 +1224,7 @@ public:
     }
 
     virtual void setNodeTexture(const std::shared_ptr<DisplayTransaction>& transaction,
-                                DisplayNode* node,
+                                const std::shared_ptr<DisplayNode>& node,
                                 DisplayTexture* newTexture,
                                 CGSize contentsSize,
                                 float contentsScale) override {
@@ -1232,13 +1232,13 @@ public:
     }
 
     virtual void setDisplayProperty(const std::shared_ptr<DisplayTransaction>& transaction,
-                                    DisplayNode* node,
+                                    const std::shared_ptr<DisplayNode>& node,
                                     const char* propertyName,
                                     NSObject* newValue) override {
         transaction->QueueProperty(std::make_shared<QueuedProperty>(node, propertyName, newValue));
     }
 
-    virtual void setNodeTopMost(DisplayNode* node, bool topMost) override {
+    virtual void setNodeTopMost(const std::shared_ptr<DisplayNode>& node, bool topMost) override {
         node->SetTopMost();
     }
 
@@ -1292,7 +1292,7 @@ public:
 
     virtual DisplayAnimation* GetMoveDisplayAnimation(DisplayAnimation** secondAnimRet, // <--------------- WHAAAAT???
                                                       id animobj,
-                                                      DisplayNode* animNode,
+                                                      const std::shared_ptr<DisplayNode>& animNode,
                                                       NSString* typeStr,
                                                       NSString* subtypeStr,
                                                       CAMediaTimingProperties* timingProperties) override {
@@ -1303,10 +1303,6 @@ public:
     virtual void ReleaseAnimation(DisplayAnimation* animation) override {
         if (animation)
             animation->Release();
-    }
-
-    virtual void ReleaseNode(DisplayNode* node) override {
-        node->Release();
     }
 
     virtual void RetainDisplayTexture(DisplayTexture* tex) override {
@@ -1441,11 +1437,11 @@ public:
         DisableRenderingListener();
     }
 
-    NSObject* getDisplayProperty(DisplayNode* node, const char* propertyName) override {
+    NSObject* getDisplayProperty(const std::shared_ptr<DisplayNode>& node, const char* propertyName) override {
         return (NSObject*)node->GetProperty(propertyName);
     }
 
-    virtual void SetShouldRasterize(DisplayNode* node, bool rasterize) override {
+    virtual void SetShouldRasterize(const std::shared_ptr<DisplayNode>& node, bool rasterize) override {
         node->SetShouldRasterize(rasterize);
     }
 

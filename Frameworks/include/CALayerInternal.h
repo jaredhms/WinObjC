@@ -66,10 +66,7 @@ public:
 
     BOOL _shouldRasterize;
 
-    ////////////////////////////////////////////
-    // TODO: USE A SHARED_PTR!
-    DisplayNode* _presentationNode;
-    ////////////////////////////////////////////
+    std::shared_ptr<DisplayNode> _presentationNode;
 
     // The XAML element backing this CALayer
     StrongId<WXFrameworkElement> _xamlElement;
@@ -103,7 +100,7 @@ public:
 - (void)_setShouldLayout;
 - (void)setContentsOrientation:(UIImageOrientation)orientation;
 - (UIImageOrientation)contentsOrientation;
-- (DisplayNode*)_presentationNode;
+- (std::shared_ptr<DisplayNode>)_presentationNode;
 - (void)_releaseContents:(BOOL)immediately;
 
 // Some additional non-standard layer swapping functionality:

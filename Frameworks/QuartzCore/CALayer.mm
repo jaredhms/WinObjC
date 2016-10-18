@@ -295,9 +295,6 @@ CAPrivateInfo::~CAPrivateInfo() {
     if (savedContext) {
         CGContextRelease(savedContext);
     }
-
-    GetCACompositor()->ReleaseNode(_presentationNode);
-    _presentationNode = NULL;
 }
 
 class LockingBufferInterface : public DisplayTextureLocking {
@@ -2313,7 +2310,7 @@ static void doRecursiveAction(CALayer* layer, NSString* actionName) {
     }
 }
 
-- (DisplayNode*)_presentationNode {
+- (std::shared_ptr<DisplayNode>)_presentationNode {
     return priv->_presentationNode;
 }
 

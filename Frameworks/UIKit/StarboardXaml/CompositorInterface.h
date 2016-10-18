@@ -106,7 +106,6 @@ public:
     }
 };
 
-typedef RefCounted<DisplayNode> DisplayNodeRef;
 typedef RefCounted<DisplayTexture> DisplayTextureRef;
 typedef RefCounted<DisplayAnimation> DisplayAnimationRef;
 
@@ -130,15 +129,26 @@ public:
     virtual ~DisplayAnimation() {};
 
     virtual void Completed() = 0;
-    virtual concurrency::task<void> AddToNode(DisplayNode* node) = 0;
+    // TODO: CAN WE DO const DisplayNode&????
+    virtual concurrency::task<void> AddToNode(DisplayNode& node) = 0;
 
     void CreateXamlAnimation();
     void Start();
     void Stop();
 
+    // TODO: CAN WE DO const DisplayNode&????
     concurrency::task<void> AddAnimation(
-        DisplayNode* node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to);
-    concurrency::task<void> AddTransitionAnimation(DisplayNode* node, const char* type, const char* subtype);
+        DisplayNode& node, 
+        const wchar_t* propertyName, 
+        bool fromValid, 
+        float from, 
+        bool toValid, 
+        float to);
+    // TODO: CAN WE DO const DisplayNode&????
+    concurrency::task<void> AddTransitionAnimation(
+        DisplayNode& node, 
+        const char* type, 
+        const char* subtype);
 };
 
 class DisplayTexture : public RefCountedType {
@@ -153,15 +163,12 @@ protected:
 
 class CAXamlCompositor;
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// TODO: GET RID OF RefCountedType - MOVE TO shared_ptr for all of these!
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // A DisplayNode is CALayer's proxy to its backing Xaml FrameworkElement.  DisplayNodes
 // are used to update the Xaml FrameworkElement's visual state (positioning, animations, etc.) based upon CALayer API calls, 
 // and it's also responsible for the CALayer's sublayer management (*if* that backing Xaml FrameworkElement supports sublayers).
 // When constructed, the DisplayNode inspects the passed-in Xaml FrameworkElement, and lights up all CALayer functionality that's
 // supported by the given FrameworkElement.
-class DisplayNode : public RefCountedType {
+class DisplayNode : public std::enable_shared_from_this<DisplayNode> {
 public:
     // The Xaml element that backs this DisplayNode
     Microsoft::WRL::ComPtr<IInspectable> _xamlElement;
@@ -199,8 +206,8 @@ public:
 
     // Sublayer management
     void AddToRoot();
-    void AddSubnode(DisplayNode* node, DisplayNode* before, DisplayNode* after);
-    void MoveNode(DisplayNode* before, DisplayNode* after);
+    void AddSubnode(const std::shared_ptr<DisplayNode>& subNode, const std::shared_ptr<DisplayNode>& before, const std::shared_ptr<DisplayNode>& after);
+    void MoveNode(const std::shared_ptr<DisplayNode>& before, const std::shared_ptr<DisplayNode>& after);
     void RemoveFromSupernode();
 
 protected:
@@ -209,7 +216,7 @@ protected:
 
     bool _isRoot;
     DisplayNode* _parent;
-    std::set<DisplayNodeRef> _subnodes;
+    std::set<std::shared_ptr<DisplayNode>> _subnodes;
     DisplayTextureRef _currentTexture;
     bool _topMost;
 };
@@ -230,5 +237,5 @@ public:
 void DispatchCompositorTransactions(
     std::deque<std::shared_ptr<ICompositorTransaction>>&& subTransactions,
     std::deque<std::shared_ptr<ICompositorAnimationTransaction>>&& animationTransactions,
-    std::map<DisplayNode*, std::map<std::string, std::shared_ptr<ICompositorTransaction>>>&& propertyTransactions,
+    std::map<std::shared_ptr<DisplayNode>, std::map<std::string, std::shared_ptr<ICompositorTransaction>>>&& propertyTransactions,
     std::deque<std::shared_ptr<ICompositorTransaction>>&& movementTransactions);

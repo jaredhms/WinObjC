@@ -933,10 +933,10 @@ static void printViews(id curView, int level) {
         popupRotationLayer = [[UIKeyboardRotationView alloc] initWithFrame:frame];
 
         CALayer* layer = [statusBarRotationLayer layer];
-        GetCACompositor()->setNodeTopMost((DisplayNode*)[layer _presentationNode], true);
+        GetCACompositor()->setNodeTopMost([layer _presentationNode], true);
         [CATransaction _addSublayerToTop:layer];
-        GetCACompositor()->setNodeTopMost((DisplayNode*)[[popupRotationLayer layer] _presentationNode], true);
-        GetCACompositor()->setNodeTopMost((DisplayNode*)[[statusBarRotationLayer layer] _presentationNode], true);
+        GetCACompositor()->setNodeTopMost([[popupRotationLayer layer] _presentationNode], true);
+        GetCACompositor()->setNodeTopMost([[statusBarRotationLayer layer] _presentationNode], true);
     }
 
     _curNotifications = [NSMutableArray new];

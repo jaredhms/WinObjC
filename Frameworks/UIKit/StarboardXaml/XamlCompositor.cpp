@@ -192,8 +192,8 @@ void DisplayAnimation::Stop() {
     storyboard->Stop();
 }
 
-concurrency::task<void> DisplayAnimation::AddAnimation(DisplayNode* node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to) {
-    auto xamlNode = GetXamlElement(node);
+concurrency::task<void> DisplayAnimation::AddAnimation(DisplayNode& node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to) {
+    auto xamlNode = GetXamlElement(&node);
     auto xamlAnimation = GetStoryboard(this);
 
     xamlAnimation->Animate(xamlNode,
@@ -204,8 +204,8 @@ concurrency::task<void> DisplayAnimation::AddAnimation(DisplayNode* node, const 
     return concurrency::task_from_result();
 }
 
-concurrency::task<void> DisplayAnimation::AddTransitionAnimation(DisplayNode* node, const char* type, const char* subtype) {
-    auto xamlNode = GetXamlElement(node);
+concurrency::task<void> DisplayAnimation::AddTransitionAnimation(DisplayNode& node, const char* type, const char* subtype) {
+    auto xamlNode = GetXamlElement(&node);
     auto xamlAnimation = GetStoryboard(this);
 
     std::string stype(type);
@@ -362,12 +362,12 @@ void DisplayNode::AddToRoot() {
     _isRoot = true;
 }
 
-void DisplayNode::AddSubnode(DisplayNode* subNode, DisplayNode* before, DisplayNode* after) {
+void DisplayNode::AddSubnode(const std::shared_ptr<DisplayNode>& subNode, const std::shared_ptr<DisplayNode>& before, const std::shared_ptr<DisplayNode>& after) {
     assert(subNode->_parent == NULL);
     subNode->_parent = this;
     _subnodes.insert(subNode);
 
-    FrameworkElement^ xamlElementForSubNode = GetXamlElement(subNode);
+    FrameworkElement^ xamlElementForSubNode = GetXamlElement(subNode.get());
     Panel^ subLayerPanelForThisNode = GetSubLayerPanel(this);
     if (!subLayerPanelForThisNode) {
         UNIMPLEMENTED_WITH_MSG(
@@ -379,7 +379,7 @@ void DisplayNode::AddSubnode(DisplayNode* subNode, DisplayNode* before, DisplayN
     if (before == NULL && after == NULL) {
         subLayerPanelForThisNode->Children->Append(xamlElementForSubNode);
     } else if (before != NULL) {
-        FrameworkElement^ xamlBeforeNode = GetXamlElement(before);
+        FrameworkElement^ xamlBeforeNode = GetXamlElement(before.get());
         unsigned int idx = 0;
         if (subLayerPanelForThisNode->Children->IndexOf(xamlBeforeNode, &idx) == true) {
             subLayerPanelForThisNode->Children->InsertAt(idx, xamlElementForSubNode);
@@ -387,7 +387,7 @@ void DisplayNode::AddSubnode(DisplayNode* subNode, DisplayNode* before, DisplayN
             FAIL_FAST();
         }
     } else if (after != NULL) {
-        FrameworkElement^ xamlAfterNode = GetXamlElement(after);
+        FrameworkElement^ xamlAfterNode = GetXamlElement(after.get());
         unsigned int idx = 0;
         if (subLayerPanelForThisNode->Children->IndexOf(xamlAfterNode, &idx) == true) {
             subLayerPanelForThisNode->Children->InsertAt(idx + 1, xamlElementForSubNode);
@@ -399,7 +399,7 @@ void DisplayNode::AddSubnode(DisplayNode* subNode, DisplayNode* before, DisplayN
     subLayerPanelForThisNode->InvalidateArrange();
 }
 
-void DisplayNode::MoveNode(DisplayNode* before, DisplayNode* after) {
+void DisplayNode::MoveNode(const std::shared_ptr<DisplayNode>& before, const std::shared_ptr<DisplayNode>& after) {
     assert(_parent != NULL);
 
     FrameworkElement^ xamlElementForThisNode = GetXamlElement(this);
@@ -414,7 +414,7 @@ void DisplayNode::MoveNode(DisplayNode* before, DisplayNode* after) {
     }
 
     if (before != NULL) {
-        FrameworkElement^ xamlBeforeNode = GetXamlElement(before);
+        FrameworkElement^ xamlBeforeNode = GetXamlElement(before.get());
 
         unsigned int srcIdx = 0;
         if (subLayerPanelForParentNode->Children->IndexOf(xamlElementForThisNode, &srcIdx) == true) {
@@ -437,7 +437,7 @@ void DisplayNode::MoveNode(DisplayNode* before, DisplayNode* after) {
     } else {
         assert(after != NULL);
 
-        FrameworkElement^ xamlAfterNode = GetXamlElement(after);
+        FrameworkElement^ xamlAfterNode = GetXamlElement(after.get());
         unsigned int srcIdx = 0;
         if (subLayerPanelForParentNode->Children->IndexOf(xamlElementForThisNode, &srcIdx) == true) {
             unsigned int destIdx = 0;
@@ -470,7 +470,7 @@ void DisplayNode::RemoveFromSupernode() {
         }
 
         subLayerPanelForParentNode = GetSubLayerPanel(_parent);
-        _parent->_subnodes.erase(this);
+        _parent->_subnodes.erase(shared_from_this());
     }
 
     if (!subLayerPanelForParentNode) {
@@ -591,7 +591,7 @@ extern "C" void SetXamlRoot(Windows::UI::Xaml::Controls::Grid^ grid, ActivationT
 void DispatchCompositorTransactions(
     std::deque<std::shared_ptr<ICompositorTransaction>>&& subTransactions,
     std::deque<std::shared_ptr<ICompositorAnimationTransaction>>&& animationTransactions,
-    std::map<DisplayNode*, std::map<std::string, std::shared_ptr<ICompositorTransaction>>>&& propertyTransactions,
+    std::map<std::shared_ptr<DisplayNode>, std::map<std::string, std::shared_ptr<ICompositorTransaction>>>&& propertyTransactions,
     std::deque<std::shared_ptr<ICompositorTransaction>>&& movementTransactions) {
 
     // Walk and process the list of subtransactions
