@@ -1373,10 +1373,15 @@ void LayerProperties::SetVisualHeight(FrameworkElement^ element, double value) {
 }
 
 void LayerProperties::_sizeChangedCallback(DependencyObject^ sender, DependencyPropertyChangedEventArgs^ args) {
+    auto element = safe_cast<FrameworkElement^>(sender);
+
     //////////////////////////////////////////////////////////////////////////////////////////////
     // TODO: Revisit whether or not we actually need this - it can't be very performant...?
-    safe_cast<FrameworkElement^>(sender)->InvalidateArrange();
+    // element->InvalidateArrange();
     //////////////////////////////////////////////////////////////////////////////////////////////
+
+    // Refresh any content gravity settings
+    _ApplyContentGravity(element, GetContentGravity(element));
 }
 
 // ContentGravity
@@ -1474,7 +1479,7 @@ void LayerProperties::_ApplyContentGravity(FrameworkElement^ element, ContentGra
         break;
 
     case ContentGravity::Resize:
-        // UIViewContentModeScaleToFil;
+        // UIViewContentModeScaleToFill;
         horizontalAlignment = HorizontalAlignment::Left;
         verticalAlignment = VerticalAlignment::Top;
         contentWidth = element->Width * scale;
