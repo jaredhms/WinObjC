@@ -1418,7 +1418,7 @@ static void doRecursiveAction(CALayer* layer, NSString* actionName) {
     }
 
     if (curAnim != nil) {
-        [curAnim _abortAnimation];
+        [curAnim _removeAnimationsFromLayer];
     }
 
     CAAnimation* animCopy = [anim copy];

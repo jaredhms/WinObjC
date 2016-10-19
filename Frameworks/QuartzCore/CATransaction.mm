@@ -258,8 +258,8 @@ __declspec(thread) CATransaction* _curTransaction, *_rootTransaction;
     [layer _displayChanged];
 }
 
-+ (void)_removeAnimationFromLayer:(CALayer*)layer animation:(DisplayAnimation*)anim {
-    UNIMPLEMENTED_WITH_MSG("_removeAnimationFromLayer not currently supported.");
++ (void)_removeAnimationFromLayer:(CALayer*)layer animation:(std::shared_ptr<DisplayAnimation>)anim {
+    GetCACompositor()->removeAnimation([self _currentTransaction]->_transactionQueue, anim);
 }
 
 /**

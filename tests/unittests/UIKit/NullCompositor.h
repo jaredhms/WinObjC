@@ -51,6 +51,9 @@ public:
     void addAnimation(const std::shared_ptr<DisplayTransaction>& transaction, id layer, id animation, id forKey) override {
     }
 
+    void removeAnimation(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<DisplayAnimation>& animation) override {
+    }
+
     void setDisplayProperty(const std::shared_ptr<DisplayTransaction>& transaction,
                             const std::shared_ptr<DisplayNode>& node,
                             const char* propertyName,
@@ -79,7 +82,7 @@ public:
         return nullptr;
     }
 
-    DisplayAnimation* GetBasicDisplayAnimation(id caanim,
+    std::shared_ptr<DisplayAnimation> GetBasicDisplayAnimation(id caanim,
                                                NSString* propertyName,
                                                NSObject* fromValue,
                                                NSObject* toValue,
@@ -87,16 +90,14 @@ public:
                                                CAMediaTimingProperties* timingProperties) override {
         return nullptr;
     }
-    DisplayAnimation* GetMoveDisplayAnimation(DisplayAnimation** secondAnimRet,
+
+    std::shared_ptr<DisplayAnimation> GetMoveDisplayAnimation(
                                               id caanim,
                                               const std::shared_ptr<DisplayNode>& animNode,
                                               NSString* type,
                                               NSString* subtype,
                                               CAMediaTimingProperties* timingProperties) override {
         return nullptr;
-    }
-
-    void ReleaseAnimation(DisplayAnimation* animation) override {
     }
 
     void RetainDisplayTexture(DisplayTexture* tex) override {

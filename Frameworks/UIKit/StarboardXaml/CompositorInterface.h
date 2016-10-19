@@ -107,11 +107,8 @@ public:
 };
 
 typedef RefCounted<DisplayTexture> DisplayTextureRef;
-typedef RefCounted<DisplayAnimation> DisplayAnimationRef;
 
-class DisplayAnimation : public RefCountedType {
-    friend class CAXamlCompositor;
-
+class DisplayAnimation : public std::enable_shared_from_this<DisplayAnimation>{
 public:
     winobjc::Id _xamlAnimation;
     enum Easing { EaseInEaseOut, EaseIn, EaseOut, Linear, Default };
@@ -160,7 +157,6 @@ protected:
     Microsoft::WRL::ComPtr<IInspectable> _xamlImage;
 };
 
-
 class CAXamlCompositor;
 
 // A DisplayNode is CALayer's proxy to its backing Xaml FrameworkElement.  DisplayNodes
@@ -175,9 +171,6 @@ public:
 
     explicit DisplayNode(IInspectable* xamlElement);
     ~DisplayNode();
-
-    // Animation support
-    concurrency::task<void> AddAnimation(DisplayAnimation* animation);
 
     // Display properties
     void SetProperty(const wchar_t* name, float value);

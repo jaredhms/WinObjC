@@ -85,14 +85,14 @@ public:
 
     // Animations
     virtual void addAnimation(const std::shared_ptr<DisplayTransaction>& transaction, id layer, id animation, id forKey) = 0;
-    virtual DisplayAnimation* GetBasicDisplayAnimation(id caanim,
+    virtual void removeAnimation(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<DisplayAnimation>& animation) = 0;
+    virtual std::shared_ptr<DisplayAnimation> GetBasicDisplayAnimation(id caanim,
                                                        NSString* propertyName,
                                                        NSObject* fromValue,
                                                        NSObject* toValue,
                                                        NSObject* byValue,
                                                        CAMediaTimingProperties* timingProperties) = 0;
-    virtual DisplayAnimation* GetMoveDisplayAnimation(DisplayAnimation** secondAnimRet,
-                                                      id caanim,
+    virtual std::shared_ptr<DisplayAnimation> GetMoveDisplayAnimation(id caanim,
                                                       const std::shared_ptr<DisplayNode>& animNode,
                                                       NSString* type,
                                                       NSString* subtype,
@@ -100,8 +100,6 @@ public:
 
     ////////////////////////////////////////////////////////////////////////
     // TODO: Switch to shared_ptr for alla these
-    virtual void ReleaseAnimation(DisplayAnimation* animation) = 0;
-
     virtual void RetainDisplayTexture(DisplayTexture* tex) = 0;
     virtual void ReleaseDisplayTexture(DisplayTexture* tex) = 0;
     ////////////////////////////////////////////////////////////////////////

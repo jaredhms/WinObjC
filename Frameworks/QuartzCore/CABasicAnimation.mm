@@ -98,7 +98,7 @@ static const wchar_t* TAG = L"CABasicAnimation";
     [object addAnimation:self forKey:key];
 }
 
-- (DisplayAnimation*)_createAnimation:(CALayer*)layer forKey:(id)forKey {
+- (std::shared_ptr<DisplayAnimation>)_createAnimation:(CALayer*)layer forKey:(id)forKey {
     _attachedLayer = layer;
 
     if (_keyPath == nil) {

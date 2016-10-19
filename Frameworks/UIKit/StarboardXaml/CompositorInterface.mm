@@ -826,14 +826,6 @@ public:
     }
 };
 
-concurrency::task<void> DisplayNode::AddAnimation(DisplayAnimation* anim) {
-    if (anim) {
-        return anim->AddToNode(*this);
-    }
-
-    return concurrency::task_from_result();
-}
-
 void DisplayNode::SetTexture(DisplayTexture* texture, float width, float height, float contentScale) {
     _currentTexture = texture;
     SetContents((texture ? texture->GetContent() : nullptr), width, height, contentScale);
@@ -992,24 +984,19 @@ void DisplayNode::UpdateProperty(const char* name, void* value) {
 
 class QueuedAnimation : public ICompositorAnimationTransaction {
 public:
-    id _layer, _animation, _key;
-    DisplayAnimationRef abortAnimation;
-    bool _abort;
+    id _layer = nil;
+    id _animation = nil;
+    id _key = nil;
+    std::shared_ptr<DisplayAnimation> _abortAnimation;
 
     QueuedAnimation(id layer, id anim, id key) {
-        abortAnimation = NULL;
-        _abort = false;
         _layer = [layer retain];
         _animation = [anim retain];
         _key = [key retain];
     }
 
-    QueuedAnimation(DisplayAnimation* animToAbort) {
-        _abort = true;
-        abortAnimation = animToAbort;
-        _layer = nil;
-        _animation = nil;
-        _key = nil;
+    QueuedAnimation(const std::shared_ptr<DisplayAnimation>& animToAbort) {
+        _abortAnimation = animToAbort;
     }
 
     ~QueuedAnimation() {
@@ -1019,17 +1006,17 @@ public:
     }
 
     concurrency::task<void> Process() override {
-        if (_abort) {
-            abortAnimation->Stop();
+        if (_abortAnimation) {
+            _abortAnimation->Stop();
         } else {
             if (![_animation wasRemoved] && ![_animation wasAborted]) {
-                DisplayAnimation* newAnimation = (DisplayAnimation*)[_animation _createAnimation:_layer forKey:_key];
+                std::shared_ptr<DisplayAnimation> newAnimation = [_animation _createAnimation:_layer forKey:_key];
                 [_animation animationDidStart];
                 [_animation animationHasStarted];
 
                 if (newAnimation) {
                     std::shared_ptr<DisplayNode> node = [_layer _presentationNode];
-                    return node->AddAnimation(newAnimation);
+                    return newAnimation->AddToNode(*node);
                 } else {
                     [_animation animationDidStop:FALSE];
                 }
@@ -1223,6 +1210,10 @@ public:
         transaction->QueueAnimation(std::make_shared<QueuedAnimation>(layer, animation, forKey));
     }
 
+    virtual void removeAnimation(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<DisplayAnimation>& animation) override {
+        transaction->QueueAnimation(std::make_shared<QueuedAnimation>(animation));
+    }
+
     virtual void setNodeTexture(const std::shared_ptr<DisplayTransaction>& transaction,
                                 const std::shared_ptr<DisplayNode>& node,
                                 DisplayTexture* newTexture,
@@ -1280,29 +1271,21 @@ public:
         ((DisplayTextureContent*)tex)->UnlockWritableBitmap();
     }
 
-    virtual DisplayAnimation* GetBasicDisplayAnimation(id animobj,
+    virtual std::shared_ptr<DisplayAnimation> GetBasicDisplayAnimation(id animobj,
                                                        NSString* propertyName,
                                                        NSObject* fromValue,
                                                        NSObject* toValue,
                                                        NSObject* byValue,
                                                        CAMediaTimingProperties* timingProperties) override {
-        DisplayAnimationBasic* basicAnim = new DisplayAnimationBasic(animobj, propertyName, fromValue, toValue, byValue, timingProperties);
-        return basicAnim;
+        return std::make_shared<DisplayAnimationBasic>(animobj, propertyName, fromValue, toValue, byValue, timingProperties);
     }
 
-    virtual DisplayAnimation* GetMoveDisplayAnimation(DisplayAnimation** secondAnimRet, // <--------------- WHAAAAT???
-                                                      id animobj,
+    virtual std::shared_ptr<DisplayAnimation> GetMoveDisplayAnimation(id animobj,
                                                       const std::shared_ptr<DisplayNode>& animNode,
                                                       NSString* typeStr,
                                                       NSString* subtypeStr,
                                                       CAMediaTimingProperties* timingProperties) override {
-        DisplayAnimationTransition* transitionAnim = new DisplayAnimationTransition(animobj, typeStr, subtypeStr);
-        return transitionAnim;
-    }
-
-    virtual void ReleaseAnimation(DisplayAnimation* animation) override {
-        if (animation)
-            animation->Release();
+        return std::make_shared<DisplayAnimationTransition>(animobj, typeStr, subtypeStr);
     }
 
     virtual void RetainDisplayTexture(DisplayTexture* tex) override {

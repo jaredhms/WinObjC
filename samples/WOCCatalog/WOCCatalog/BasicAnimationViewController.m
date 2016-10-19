@@ -150,4 +150,13 @@
     [imageViewRightBottom.layer addAnimation:animation forKey:@"transformAnimation"];
 }
 
+-(void)viewDidDisappear:(BOOL)animated {
+    [imageViewLeftTop.layer removeAllAnimations];
+    [imageViewMidTop.layer removeAllAnimations];
+    [imageViewRightTop.layer removeAllAnimations];
+    [imageViewLeftBottom.layer removeAllAnimations];
+    [imageViewMidBottom.layer removeAllAnimations];
+    [imageViewRightBottom.layer removeAllAnimations];
+}
+
 @end

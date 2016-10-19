@@ -1176,8 +1176,9 @@ static void doResize(unsigned mask, float& pos, float& size, float parentSize, f
 }
 
 static void adjustSubviews(UIView* self, CGSize parentSize, CGSize delta) {
-    if (!self->priv)
+    if (!self->priv) {
         return;
+    }
 
     if (self->priv->autoresizesSubviews) {
         //  Go through each subview and resize it

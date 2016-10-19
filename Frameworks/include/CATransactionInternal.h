@@ -36,5 +36,5 @@
 
 + (void)_setPropertyForLayer:(CALayer*)layer name:(NSString*)propertyName value:(NSObject*)newValue;
 + (void)_addSublayerToTop:(CALayer*)layer;
-+ (void)_removeAnimationFromLayer:(CALayer*)layer animation:(DisplayAnimation*)anim;
++ (void)_removeAnimationFromLayer:(CALayer*)layer animation:(std::shared_ptr<DisplayAnimation>)anim;
 @end

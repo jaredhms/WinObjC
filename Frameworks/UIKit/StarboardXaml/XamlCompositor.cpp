@@ -176,12 +176,14 @@ void DisplayAnimation::CreateXamlAnimation() {
 void DisplayAnimation::Start() {
     auto xamlAnimation = (CoreAnimation::EventedStoryboard^)(Platform::Object^)_xamlAnimation;
 
-    AddRef();
-    xamlAnimation->Completed = ref new CoreAnimation::AnimationMethod([this](Platform::Object^ sender) {
-        this->Completed();
-        auto xamlAnimation = (CoreAnimation::EventedStoryboard^)(Platform::Object^)this->_xamlAnimation;
-        xamlAnimation->Completed = nullptr;
-        this->Release();
+    std::weak_ptr<DisplayAnimation> weakThis = shared_from_this();
+    xamlAnimation->Completed = ref new CoreAnimation::AnimationMethod([weakThis](Platform::Object^ sender) {
+        std::shared_ptr<DisplayAnimation> strongThis = weakThis.lock();
+        if (strongThis) {
+            strongThis->Completed();
+            auto xamlAnimation = (CoreAnimation::EventedStoryboard^)(Platform::Object^)strongThis->_xamlAnimation;
+            xamlAnimation->Completed = nullptr;
+        }
     });
     xamlAnimation->Start();
 }
@@ -190,6 +192,8 @@ void DisplayAnimation::Stop() {
     auto xamlAnimation = (CoreAnimation::EventedStoryboard^)(Platform::Object^)_xamlAnimation;
     auto storyboard = (Media::Animation::Storyboard^)(Platform::Object^)xamlAnimation->GetStoryboard();
     storyboard->Stop();
+    xamlAnimation->Completed = nullptr;
+    _xamlAnimation = nullptr;
 }
 
 concurrency::task<void> DisplayAnimation::AddAnimation(DisplayNode& node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to) {
