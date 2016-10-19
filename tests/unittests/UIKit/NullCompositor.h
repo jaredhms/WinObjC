@@ -19,70 +19,63 @@
 
 class NullCompositor : public CACompositorInterface {
 public:
-    void ProcessTransactions() override {
+    virtual bool IsRunningAsFramework() override {
+        return false;
     }
-    std::shared_ptr<DisplayNode> CreateDisplayNode(const Microsoft::WRL::ComPtr<IInspectable>& xamlElement) override {
-        return nullptr;
-    }
-    Microsoft::WRL::ComPtr<IInspectable> GetXamlLayoutElement(const std::shared_ptr<DisplayNode>&) override {
-        return Microsoft::WRL::ComPtr<IInspectable>();
-    }
+
     std::shared_ptr<DisplayTransaction> CreateDisplayTransaction() override {
         return nullptr;
     }
     void QueueDisplayTransaction(const std::shared_ptr<DisplayTransaction>& transaction,
-                                 const std::shared_ptr<DisplayTransaction>& onTransaction) override {
+        const std::shared_ptr<DisplayTransaction>& onTransaction) override {
+    }
+    void ProcessTransactions() override {
+    }
+
+    std::shared_ptr<ILayerProxy> CreateLayerProxy(const Microsoft::WRL::ComPtr<IInspectable>& xamlElement) override {
+        return nullptr;
     }
 
     void addNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                 const std::shared_ptr<DisplayNode>& node,
-                 const std::shared_ptr<DisplayNode>& superNode,
-                 const std::shared_ptr<DisplayNode>& beforeNode,
-                 const std::shared_ptr<DisplayNode>& afterNode) override {
+                 const std::shared_ptr<ILayerProxy>& node,
+                 const std::shared_ptr<ILayerProxy>& superNode,
+                 const std::shared_ptr<ILayerProxy>& beforeNode,
+                 const std::shared_ptr<ILayerProxy>& afterNode) override {
     }
     void moveNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                  const std::shared_ptr<DisplayNode>& node,
-                  const std::shared_ptr<DisplayNode>& beforeNode,
-                  const std::shared_ptr<DisplayNode>& afterNode) override {
+                  const std::shared_ptr<ILayerProxy>& node,
+                  const std::shared_ptr<ILayerProxy>& beforeNode,
+                  const std::shared_ptr<ILayerProxy>& afterNode) override {
     }
-    void removeNode(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<DisplayNode>& pNode) override {
-    }
-
-    void addAnimation(const std::shared_ptr<DisplayTransaction>& transaction, id layer, id animation, id forKey) override {
-    }
-
-    void removeAnimation(const std::shared_ptr<DisplayTransaction>& transaction,
-                         const std::shared_ptr<DisplayAnimation>& animation) override {
+    void removeNode(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<ILayerProxy>& node) override {
     }
 
     void setDisplayProperty(const std::shared_ptr<DisplayTransaction>& transaction,
-                            const std::shared_ptr<DisplayNode>& node,
+                            const std::shared_ptr<ILayerProxy>& node,
                             const char* propertyName,
                             NSObject* newValue) override {
     }
-
     void setNodeTexture(const std::shared_ptr<DisplayTransaction>& transaction,
-                        const std::shared_ptr<DisplayNode>& node,
+                        const std::shared_ptr<ILayerProxy>& node,
                         const std::shared_ptr<DisplayTexture>& newTexture,
                         CGSize contentsSize,
                         float contentsScale) override {
     }
-
-    NSObject* getDisplayProperty(const std::shared_ptr<DisplayNode>& node, const char* propertyName = NULL) override {
-        return nil;
-    }
-
-    void setNodeTopMost(const std::shared_ptr<DisplayNode>& node, bool topMost) override {
+    void setNodeTopMost(const std::shared_ptr<ILayerProxy>& node, bool topMost) override {
     }
 
     std::shared_ptr<DisplayTexture> GetDisplayTextureForCGImage(CGImageRef img, bool create) override {
         return nullptr;
     }
-
     Microsoft::WRL::ComPtr<IInspectable> GetBitmapForCGImage(CGImageRef img) override {
         return nullptr;
     }
 
+    void addAnimation(const std::shared_ptr<DisplayTransaction>& transaction, id layer, id animation, id forKey) override {
+    }
+    void removeAnimation(const std::shared_ptr<DisplayTransaction>& transaction,
+        const std::shared_ptr<DisplayAnimation>& animation) override {
+    }
     std::shared_ptr<DisplayAnimation> GetBasicDisplayAnimation(id caanim,
                                                                NSString* propertyName,
                                                                NSObject* fromValue,
@@ -91,9 +84,8 @@ public:
                                                                CAMediaTimingProperties* timingProperties) override {
         return nullptr;
     }
-
     std::shared_ptr<DisplayAnimation> GetMoveDisplayAnimation(id caanim,
-                                                              const std::shared_ptr<DisplayNode>& animNode,
+                                                              const std::shared_ptr<ILayerProxy>& animNode,
                                                               NSString* type,
                                                               NSString* subtype,
                                                               CAMediaTimingProperties* timingProperties) override {
@@ -146,12 +138,5 @@ public:
     void EnableDisplaySyncNotification() override {
     }
     void DisableDisplaySyncNotification() override {
-    }
-
-    virtual void SetShouldRasterize(const std::shared_ptr<DisplayNode>& node, bool rasterize) override {
-    }
-
-    virtual bool IsRunningAsFramework() override {
-        return false;
     }
 };

@@ -52,6 +52,8 @@
 #import <UWP/WindowsDevicesInput.h>
 #import "UIColorInternal.h"
 
+#import "LayerProxy.h"
+
 using namespace Microsoft::WRL;
 
 static const wchar_t* TAG = L"CompositorInterface";
@@ -300,7 +302,7 @@ public:
         [_subType release];
     }
 
-    concurrency::task<void> AddToNode(DisplayNode& node) {
+    concurrency::task<void> AddToNode(ILayerProxy& node) {
         CreateXamlAnimation();
         return AddTransitionAnimation(node, [_type UTF8String], [_subType UTF8String]);
     }
@@ -698,7 +700,7 @@ public:
         [_byValue release];
     }
 
-    concurrency::task<void> AddToNode(DisplayNode& node) {
+    concurrency::task<void> AddToNode(ILayerProxy& node) {
         CreateXamlAnimation();
 
         const char* propName = [_propertyName UTF8String];
@@ -806,162 +808,6 @@ public:
     }
 };
 
-void DisplayNode::SetTexture(const std::shared_ptr<DisplayTexture>& texture, float width, float height, float contentScale) {
-    _currentTexture = texture;
-    SetContents((texture ? texture->GetContent() : nullptr), width, height, contentScale);
-}
-
-void* DisplayNode::GetProperty(const char* name) {
-    NSObject* ret = nil;
-
-    if (strcmp(name, "position") == 0) {
-        CGPoint pos;
-
-        pos.x = _GetPresentationPropertyValue("position.x");
-        pos.y = _GetPresentationPropertyValue("position.y");
-
-        ret = [NSValue valueWithCGPoint:pos];
-    } else if (strcmp(name, "bounds.origin") == 0) {
-        CGPoint pos;
-
-        pos.x = _GetPresentationPropertyValue("origin.x");
-        pos.y = _GetPresentationPropertyValue("origin.y");
-
-        ret = [NSValue valueWithCGPoint:pos];
-    } else if (strcmp(name, "bounds.size") == 0) {
-        CGSize size;
-
-        size.width = _GetPresentationPropertyValue("size.width");
-        size.height = _GetPresentationPropertyValue("size.height");
-
-        ret = [NSValue valueWithCGSize:size];
-    } else if (strcmp(name, "bounds") == 0) {
-        CGRect rect;
-
-        rect.size.width = _GetPresentationPropertyValue("size.width");
-        rect.size.height = _GetPresentationPropertyValue("size.height");
-        rect.origin.x = _GetPresentationPropertyValue("origin.x");
-        rect.origin.y = _GetPresentationPropertyValue("origin.y");
-
-        ret = [NSValue valueWithCGRect:rect];
-    } else if (strcmp(name, "opacity") == 0) {
-        float value = _GetPresentationPropertyValue("opacity");
-
-        ret = [NSNumber numberWithFloat:value];
-    } else if (strcmp(name, "transform") == 0) {
-        float angle = _GetPresentationPropertyValue("transform.rotation");
-        float scale[2];
-        float translation[2];
-
-        scale[0] = _GetPresentationPropertyValue("transform.scale.x");
-        scale[1] = _GetPresentationPropertyValue("transform.scale.y");
-
-        translation[0] = _GetPresentationPropertyValue("transform.translation.x");
-        translation[1] = _GetPresentationPropertyValue("transform.translation.y");
-
-        CATransform3D trans = CATransform3DMakeRotation(-angle * M_PI / 180.0f, 0, 0, 1.0f);
-        trans = CATransform3DScale(trans, scale[0], scale[1], 0.0f);
-        trans = CATransform3DTranslate(trans, translation[0], translation[1], 0.0f);
-
-        ret = [NSValue valueWithCATransform3D:trans];
-    } else {
-        FAIL_FAST_HR(E_NOTIMPL);
-    }
-
-    return ret;
-}
-
-void DisplayNode::UpdateProperty(const char* name, void* value) {
-    NSObject* newValue = (NSObject*)value;
-    if (name == NULL)
-        return;
-    if ([NSThread currentThread] != [NSThread mainThread]) {
-        return;
-    }
-
-    if (strcmp(name, "contentsCenter") == 0) {
-        CGRect value = [(NSValue*)newValue CGRectValue];
-        SetContentsCenter(value.origin.x, value.origin.y, value.size.width, value.size.height);
-    } else if (strcmp(name, "anchorPoint") == 0) {
-        CGPoint value = [(NSValue*)newValue CGPointValue];
-        SetProperty(L"anchorPoint.x", value.x);
-        SetProperty(L"anchorPoint.y", value.y);
-    } else if (strcmp(name, "position") == 0) {
-        CGPoint position = [(NSValue*)newValue CGPointValue];
-        SetProperty(L"position.x", position.x);
-        SetProperty(L"position.y", position.y);
-    } else if (strcmp(name, "bounds.origin") == 0) {
-        CGPoint value = [(NSValue*)newValue CGPointValue];
-        SetProperty(L"origin.x", value.x);
-        SetProperty(L"origin.y", value.y);
-    } else if (strcmp(name, "bounds.size") == 0) {
-        CGSize size = [(NSValue*)newValue CGSizeValue];
-        SetProperty(L"size.width", size.width);
-        SetProperty(L"size.height", size.height);
-    } else if (strcmp(name, "opacity") == 0) {
-        float value = [(NSNumber*)newValue floatValue];
-        SetProperty(L"opacity", value);
-    } else if (strcmp(name, "hidden") == 0) {
-        bool value = [(NSNumber*)newValue boolValue];
-        SetHidden(value);
-    } else if (strcmp(name, "masksToBounds") == 0) {
-        if (!_isRoot) {
-            bool value = [(NSNumber*)newValue boolValue];
-            SetMasksToBounds(value);
-        } else {
-            SetMasksToBounds(true);
-        }
-    } else if (strcmp(name, "transform") == 0) {
-        CATransform3D value = [(NSValue*)newValue CATransform3DValue];
-        float translation[3] = { 0 };
-        float scale[3] = { 0 };
-
-        Quaternion qFrom;
-        qFrom.CreateFromMatrix((float*)&(value));
-
-        CATransform3DGetScale(value, scale);
-        CATransform3DGetPosition(value, translation);
-
-        SetProperty(L"transform.rotation", (float)-qFrom.roll() * 180.0f / M_PI);
-        SetProperty(L"transform.scale.x", scale[0]);
-        SetProperty(L"transform.scale.y", scale[1]);
-        SetProperty(L"transform.translation.x", translation[0]);
-        SetProperty(L"transform.translation.y", translation[1]);
-    } else if (strcmp(name, "contentsScale") == 0) {
-        UNIMPLEMENTED_WITH_MSG("contentsScale not implemented");
-    } else if (strcmp(name, "contentsOrientation") == 0) {
-        int position = [(NSNumber*)newValue intValue];
-        float toPosition = 0;
-        if (position == UIImageOrientationUp) {
-            toPosition = 0;
-        } else if (position == UIImageOrientationDown) {
-            toPosition = 180;
-        } else if (position == UIImageOrientationLeft) {
-            toPosition = 270;
-        } else if (position == UIImageOrientationRight) {
-            toPosition = 90;
-        }
-        SetProperty(L"transform.rotation", toPosition);
-    } else if (strcmp(name, "zIndex") == 0) {
-        ///////////////////////////////////////////////////////////////////////////////////////
-        // TODO: This should just happen in UIWindow.mm and should get deleted from here
-        int value = [(NSNumber*)newValue intValue];
-        SetNodeZIndex(value);
-        ///////////////////////////////////////////////////////////////////////////////////////
-    } else if (strcmp(name, "gravity") == 0) {
-        SetPropertyInt(L"gravity", [(NSNumber*)newValue intValue]);
-    } else if (strcmp(name, "backgroundColor") == 0) {
-        const __CGColorQuad* color = [(UIColor*)newValue _getColors];
-        if (color) {
-            SetBackgroundColor(color->r, color->g, color->b, color->a);
-        } else {
-            SetBackgroundColor(0.0f, 0.0f, 0.0f, 0.0f);
-        }
-    } else {
-        FAIL_FAST_HR(E_NOTIMPL);
-    }
-}
-
 class QueuedAnimation : public ICompositorAnimationTransaction {
 public:
     id _layer = nil;
@@ -995,7 +841,7 @@ public:
                 [_animation animationHasStarted];
 
                 if (newAnimation) {
-                    std::shared_ptr<DisplayNode> node = [_layer _presentationNode];
+                    std::shared_ptr<ILayerProxy> node = [_layer _layerProxy];
                     return newAnimation->AddToNode(*node);
                 } else {
                     [_animation animationDidStop:FALSE];
@@ -1009,7 +855,7 @@ public:
 
 class QueuedProperty : public ICompositorTransaction {
 public:
-    std::shared_ptr<DisplayNode> _node;
+    std::shared_ptr<LayerProxy> _node;
     char* _propertyName;
     NSObject* _propertyValue;
     std::shared_ptr<DisplayTexture> _newTexture;
@@ -1017,8 +863,8 @@ public:
     float _contentsScale;
     bool _applyingTexture;
 
-    QueuedProperty(const std::shared_ptr<DisplayNode>& node, const std::shared_ptr<DisplayTexture>& newTexture, CGSize contentsSize, float contentsScale) {
-        _node = node;
+    QueuedProperty(const std::shared_ptr<ILayerProxy>& node, const std::shared_ptr<DisplayTexture>& newTexture, CGSize contentsSize, float contentsScale) {
+        _node = std::dynamic_pointer_cast<LayerProxy>(node);
         _propertyName = IwStrDup("contents");
         _propertyValue = NULL;
         _newTexture = newTexture;
@@ -1027,8 +873,8 @@ public:
         _applyingTexture = true;
     }
 
-    QueuedProperty(const std::shared_ptr<DisplayNode>& node, const char* propertyName, NSObject* propertyValue) {
-        _node = node;
+    QueuedProperty(const std::shared_ptr<ILayerProxy>& node, const char* propertyName, NSObject* propertyValue) {
+        _node = std::dynamic_pointer_cast<LayerProxy>(node);
         _propertyName = IwStrDup(propertyName);
         _propertyValue = [propertyValue retain];
         _newTexture = NULL;
@@ -1056,24 +902,25 @@ public:
 
 class QueuedNodeMovement : public ICompositorTransaction {
 public:
-    std::shared_ptr<DisplayNode> _node;
-    std::shared_ptr<DisplayNode> _before, _after;
-    std::shared_ptr<DisplayNode> _supernode;
+    std::shared_ptr<LayerProxy> _node;
+    std::shared_ptr<LayerProxy> _before;
+    std::shared_ptr<LayerProxy> _after;
+    std::shared_ptr<LayerProxy> _supernode;
 
     enum MovementType { Add, Move, Remove };
 
     MovementType _type;
 
     QueuedNodeMovement(MovementType type,
-                       const std::shared_ptr<DisplayNode>& node,
-                       const std::shared_ptr<DisplayNode>& before,
-                       const std::shared_ptr<DisplayNode>& after,
-                       const std::shared_ptr<DisplayNode>& supernode) {
+                       const std::shared_ptr<ILayerProxy>& node,
+                       const std::shared_ptr<ILayerProxy>& before,
+                       const std::shared_ptr<ILayerProxy>& after,
+                       const std::shared_ptr<ILayerProxy>& supernode) {
         _type = type;
-        _node = node;
-        _before = before;
-        _after = after;
-        _supernode = supernode;
+        _node = std::dynamic_pointer_cast<LayerProxy>(node);
+        _before = std::dynamic_pointer_cast<LayerProxy>(before);
+        _after = std::dynamic_pointer_cast<LayerProxy>(after);
+        _supernode = std::dynamic_pointer_cast<LayerProxy>(supernode);
     }
 
     void Process() override {
@@ -1102,7 +949,7 @@ using namespace std;
 class DisplayTransaction : public ICompositorTransaction {
     std::deque<std::shared_ptr<ICompositorTransaction>> _queuedTransactions;
     std::deque<std::shared_ptr<ICompositorAnimationTransaction>> _queuedAnimations;
-    std::map<std::shared_ptr<DisplayNode>, std::map<std::string, std::shared_ptr<ICompositorTransaction>>> _queuedProperties;
+    std::map<std::shared_ptr<ILayerProxy>, std::map<std::string, std::shared_ptr<ICompositorTransaction>>> _queuedProperties;
     std::deque<std::shared_ptr<ICompositorTransaction>> _queuedNodeMovements;
 
 public:
@@ -1145,16 +992,9 @@ deque<std::shared_ptr<DisplayTransaction>> s_queuedTransactions;
 
 class CAXamlCompositor : public CACompositorInterface {
 public:
-    virtual std::shared_ptr<DisplayNode> CreateDisplayNode(const ComPtr<IInspectable>& xamlElement) override {
-        return std::make_shared<DisplayNode>(xamlElement.Get());
+    virtual std::shared_ptr<ILayerProxy> CreateLayerProxy(const ComPtr<IInspectable>& xamlElement) override {
+        return std::make_shared<LayerProxy>(xamlElement.Get());
     }
-
-    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // TODO: WE SHOULDN'T NEED THIS ANYMORE, BUT IF WE DO, MOVE IT TO DISPLAYNODE AND JUST CALL IT GETXAMLELEMENT
-    virtual ComPtr<IInspectable> GetXamlLayoutElement(const std::shared_ptr<DisplayNode>& displayNode) override {
-        return displayNode->_xamlElement;
-    }
-    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     std::shared_ptr<DisplayTransaction> CreateDisplayTransaction() override {
         return std::make_shared<DisplayTransaction>();
@@ -1170,23 +1010,23 @@ public:
     }
 
     virtual void addNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                         const std::shared_ptr<DisplayNode>& node,
-                         const std::shared_ptr<DisplayNode>& superNode,
-                         const std::shared_ptr<DisplayNode>& beforeNode,
-                         const std::shared_ptr<DisplayNode>& afterNode) override {
+                         const std::shared_ptr<ILayerProxy>& node,
+                         const std::shared_ptr<ILayerProxy>& superNode,
+                         const std::shared_ptr<ILayerProxy>& beforeNode,
+                         const std::shared_ptr<ILayerProxy>& afterNode) override {
         transaction->QueueNodeMovement(
             std::make_shared<QueuedNodeMovement>(QueuedNodeMovement::Add, node, beforeNode, afterNode, superNode));
     }
 
     virtual void moveNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                          const std::shared_ptr<DisplayNode>& node,
-                          const std::shared_ptr<DisplayNode>& beforeNode,
-                          const std::shared_ptr<DisplayNode>& afterNode) override {
+                          const std::shared_ptr<ILayerProxy>& node,
+                          const std::shared_ptr<ILayerProxy>& beforeNode,
+                          const std::shared_ptr<ILayerProxy>& afterNode) override {
         transaction->QueueNodeMovement(
             std::make_shared<QueuedNodeMovement>(QueuedNodeMovement::Move, node, beforeNode, afterNode, nullptr));
     }
 
-    virtual void removeNode(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<DisplayNode>& node) override {
+    virtual void removeNode(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<ILayerProxy>& node) override {
         transaction->QueueNodeMovement(std::make_shared<QueuedNodeMovement>(QueuedNodeMovement::Remove, node, nullptr, nullptr, nullptr));
     }
 
@@ -1200,7 +1040,7 @@ public:
     }
 
     virtual void setNodeTexture(const std::shared_ptr<DisplayTransaction>& transaction,
-                                const std::shared_ptr<DisplayNode>& node,
+                                const std::shared_ptr<ILayerProxy>& node,
                                 const std::shared_ptr<DisplayTexture>& newTexture,
                                 CGSize contentsSize,
                                 float contentsScale) override {
@@ -1208,14 +1048,14 @@ public:
     }
 
     virtual void setDisplayProperty(const std::shared_ptr<DisplayTransaction>& transaction,
-                                    const std::shared_ptr<DisplayNode>& node,
+                                    const std::shared_ptr<ILayerProxy>& node,
                                     const char* propertyName,
                                     NSObject* newValue) override {
         transaction->QueueProperty(std::make_shared<QueuedProperty>(node, propertyName, newValue));
     }
 
-    virtual void setNodeTopMost(const std::shared_ptr<DisplayNode>& node, bool topMost) override {
-        node->SetTopMost();
+    virtual void setNodeTopMost(const std::shared_ptr<ILayerProxy>& node, bool topMost) override {
+        std::dynamic_pointer_cast<LayerProxy>(node)->SetTopMost();
     }
 
     virtual std::shared_ptr<DisplayTexture> GetDisplayTextureForCGImage(CGImageRef img, bool create) override {
@@ -1269,7 +1109,7 @@ public:
     }
 
     virtual std::shared_ptr<DisplayAnimation> GetMoveDisplayAnimation(id animobj,
-                                                                      const std::shared_ptr<DisplayNode>& animNode,
+                                                                      const std::shared_ptr<ILayerProxy>& animNode,
                                                                       NSString* typeStr,
                                                                       NSString* subtypeStr,
                                                                       CAMediaTimingProperties* timingProperties) override {
@@ -1398,14 +1238,6 @@ public:
 
     void DisableDisplaySyncNotification() override {
         DisableRenderingListener();
-    }
-
-    NSObject* getDisplayProperty(const std::shared_ptr<DisplayNode>& node, const char* propertyName) override {
-        return (NSObject*)node->GetProperty(propertyName);
-    }
-
-    virtual void SetShouldRasterize(const std::shared_ptr<DisplayNode>& node, bool rasterize) override {
-        node->SetShouldRasterize(rasterize);
     }
 
     virtual bool IsRunningAsFramework() override {

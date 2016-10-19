@@ -13,14 +13,42 @@
 // THE SOFTWARE.
 //
 //******************************************************************************
+#pragma once
 
-#if defined(__cplusplus) && defined(__OBJC__) && !defined(__CA_COMPOSITOR_H)
-#define __CA_COMPOSITOR_H
+#if defined(__OBJC__)
+
+#include <COMIncludes.h>
+#import <WRLHelpers.h>
+#import <ErrorHandling.h>
+#import <RawBuffer.h>
+#import <wrl/client.h>
+#import <wrl/implements.h>
+#import <wrl/async.h>
+#import <wrl/wrappers/corewrappers.h>
+#import <windows.foundation.h>
+#include <COMIncludes_end.h>
+
+#else
+
+#include <wrl/client.h>
+
+#endif
+
+// Proxy between CALayer and its Xaml representation
+struct ILayerProxy {
+public:
+    virtual ~ILayerProxy() {}
+
+    virtual Microsoft::WRL::ComPtr<IInspectable> GetXamlElement() = 0;
+    virtual void* GetPropertyValue(const char* propertyName) = 0;
+    virtual void SetShouldRasterize(bool shouldRasterize) = 0;
+};
+
+#if defined(__cplusplus) && defined(__OBJC__)
 
 #include <memory>
 #include "winobjc\winobjc.h"
 
-class DisplayNode;
 class DisplayAnimation;
 class DisplayTexture;
 class DisplayTransaction;
@@ -42,36 +70,32 @@ public:
                                          const std::shared_ptr<DisplayTransaction>& onTransaction) = 0;
     virtual void ProcessTransactions() = 0;
 
-    // DisplayNode creation
-    virtual std::shared_ptr<DisplayNode> CreateDisplayNode(const Microsoft::WRL::ComPtr<IInspectable>& xamlElement) = 0;
+    // LayerProxy creation
+    virtual std::shared_ptr<ILayerProxy> CreateLayerProxy(const Microsoft::WRL::ComPtr<IInspectable>& xamlElement) = 0;
 
-    virtual Microsoft::WRL::ComPtr<IInspectable> GetXamlLayoutElement(const std::shared_ptr<DisplayNode>&) = 0;
-
-    // DisplayNode Sublayer management
+    // Sublayer management
     virtual void addNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                         const std::shared_ptr<DisplayNode>& node,
-                         const std::shared_ptr<DisplayNode>& superNode,
-                         const std::shared_ptr<DisplayNode>& beforeNode,
-                         const std::shared_ptr<DisplayNode>& afterNode) = 0;
+                         const std::shared_ptr<ILayerProxy>& node,
+                         const std::shared_ptr<ILayerProxy>& superNode,
+                         const std::shared_ptr<ILayerProxy>& beforeNode,
+                         const std::shared_ptr<ILayerProxy>& afterNode) = 0;
     virtual void moveNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                          const std::shared_ptr<DisplayNode>& node,
-                          const std::shared_ptr<DisplayNode>& beforeNode,
-                          const std::shared_ptr<DisplayNode>& afterNode) = 0;
-    virtual void removeNode(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<DisplayNode>& node) = 0;
+                          const std::shared_ptr<ILayerProxy>& node,
+                          const std::shared_ptr<ILayerProxy>& beforeNode,
+                          const std::shared_ptr<ILayerProxy>& afterNode) = 0;
+    virtual void removeNode(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<ILayerProxy>& node) = 0;
 
-    // DisplayNode layer display properties
+    // Layer properties
     virtual void setDisplayProperty(const std::shared_ptr<DisplayTransaction>& transaction,
-                                    const std::shared_ptr<DisplayNode>& node,
+                                    const std::shared_ptr<ILayerProxy>& node,
                                     const char* propertyName,
                                     NSObject* newValue) = 0;
     virtual void setNodeTexture(const std::shared_ptr<DisplayTransaction>& transaction,
-                                const std::shared_ptr<DisplayNode>& node,
+                                const std::shared_ptr<ILayerProxy>& node,
                                 const std::shared_ptr<DisplayTexture>& newTexture,
                                 CGSize contentsSize,
                                 float contentsScale) = 0;
-    virtual NSObject* getDisplayProperty(const std::shared_ptr<DisplayNode>& node, const char* propertyName = NULL) = 0;
-    virtual void setNodeTopMost(const std::shared_ptr<DisplayNode>& node, bool topMost) = 0;
-    virtual void SetShouldRasterize(const std::shared_ptr<DisplayNode>& node, bool rasterize) = 0;
+    virtual void setNodeTopMost(const std::shared_ptr<ILayerProxy>& node, bool topMost) = 0;
 
     // DisplayTextures
     virtual std::shared_ptr<DisplayTexture> GetDisplayTextureForCGImage(CGImageRef img, bool create) = 0;
@@ -94,7 +118,7 @@ public:
                                                                        NSObject* byValue,
                                                                        CAMediaTimingProperties* timingProperties) = 0;
     virtual std::shared_ptr<DisplayAnimation> GetMoveDisplayAnimation(id caanim,
-                                                                      const std::shared_ptr<DisplayNode>& animNode,
+                                                                      const std::shared_ptr<ILayerProxy>& animNode,
                                                                       NSString* type,
                                                                       NSString* subtype,
                                                                       CAMediaTimingProperties* timingProperties) = 0;

@@ -189,13 +189,11 @@ static void DoDisplayList(CALayer* layer) {
             }
         }
 
-        //////////////////////////////////////////////////////////////////////////////////
-        // TODO: USE A shared_ptr!
         std::shared_ptr<DisplayTexture> newTexture = [cur->self _getDisplayTexture];
         cur->needsDisplay = FALSE;
         if (newTexture) {
             GetCACompositor()->setNodeTexture([CATransaction _currentDisplayTransaction],
-                                              cur->_presentationNode,
+                                              cur->_layerProxy,
                                               newTexture,
                                               cur->contentsSize,
                                               cur->contentsScale);
@@ -268,11 +266,12 @@ CAPrivateInfo::CAPrivateInfo(CALayer* self, WXFrameworkElement* xamlElement) {
     needsDisplayOnBoundsChange = FALSE;
     _name = nil;
 
-    _presentationNode = GetCACompositor()->CreateDisplayNode(xamlElement ? [xamlElement comObj] : nullptr);
+    // Create our backing layer proxy
+    _layerProxy = GetCACompositor()->CreateLayerProxy(xamlElement ? [xamlElement comObj] : nullptr);
 
-    // Query for our backing XAML node - DisplayNode will have created one if the xamlElement passed into
-    // the previous CreateDisplayNode calls was nullptr.
-    Microsoft::WRL::ComPtr<IInspectable> inspectableNode(GetCACompositor()->GetXamlLayoutElement(_presentationNode));
+    // Query for our backing XAML node.
+    // ILayerProxy will have created one if the xamlElement passed into the previous CreateLayerProxy call was nullptr.
+    Microsoft::WRL::ComPtr<IInspectable> inspectableNode(_layerProxy->GetXamlElement());
     _xamlElement = _createRtProxy([WXFrameworkElement class], inspectableNode.Get());
 }
 
@@ -1305,7 +1304,7 @@ static void doRecursiveAction(CALayer* layer, NSString* actionName) {
         }
     }
 
-    GetCACompositor()->setNodeTexture([CATransaction _currentDisplayTransaction], priv->_presentationNode, NULL, CGSizeMake(0, 0), 0.0f);
+    GetCACompositor()->setNodeTexture([CATransaction _currentDisplayTransaction], priv->_layerProxy, NULL, CGSizeMake(0, 0), 0.0f);
     [self setNeedsDisplay];
 }
 
@@ -1716,7 +1715,7 @@ static void doRecursiveAction(CALayer* layer, NSString* actionName) {
 */
 - (void)setShouldRasterize:(BOOL)shouldRasterize {
     priv->_shouldRasterize = shouldRasterize;
-    GetCACompositor()->SetShouldRasterize(priv->_presentationNode, shouldRasterize);
+    priv->_layerProxy->SetShouldRasterize(shouldRasterize);
 }
 
 /**
@@ -1821,7 +1820,7 @@ static void doRecursiveAction(CALayer* layer, NSString* actionName) {
         if (shouldAnimate) {
             ret = [CATransaction _implicitAnimationForKey:key];
             if (ret != nil) {
-                NSObject* value = GetCACompositor()->getDisplayProperty(priv->_presentationNode, [key UTF8String]);
+                NSObject* value = reinterpret_cast<NSObject*>(priv->_layerProxy->GetPropertyValue([key UTF8String]));
                 [static_cast<CABasicAnimation*>(ret) setFromValue:value];
             }
         }
@@ -2289,8 +2288,8 @@ static void doRecursiveAction(CALayer* layer, NSString* actionName) {
     }
 }
 
-- (std::shared_ptr<DisplayNode>)_presentationNode {
-    return priv->_presentationNode;
+- (std::shared_ptr<ILayerProxy>)_layerProxy {
+    return priv->_layerProxy;
 }
 
 - (int)_pixelWidth {
@@ -2350,7 +2349,7 @@ static void doRecursiveAction(CALayer* layer, NSString* actionName) {
 }
 
 - (NSObject*)presentationValueForKey:(NSString*)key {
-    return GetCACompositor()->getDisplayProperty(priv->_presentationNode, [key UTF8String]);
+    return reinterpret_cast<NSObject*>(priv->_layerProxy->GetPropertyValue([key UTF8String]));
 }
 
 ////////////////////////////////////////////////////////////////////

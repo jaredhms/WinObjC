@@ -30,6 +30,8 @@
 #include "CompositorInterface.h"
 #include <StringHelpers.h>
 
+#include "LayerProxy.h"
+
 using namespace Microsoft::WRL;
 using namespace UIKit::Private::CoreAnimation;
 using namespace Windows::Foundation;
@@ -111,23 +113,6 @@ void DisableRenderingListener() {
     renderListener->Stop();
 }
 
-__inline FrameworkElement^ GetXamlElement(DisplayNode* node) {
-    return dynamic_cast<FrameworkElement^>(reinterpret_cast<Platform::Object^>(node->_xamlElement.Get()));
-};
-
-__inline Panel^ GetSubLayerPanel(DisplayNode* node) {
-    FrameworkElement^ xamlElement = GetXamlElement(node);
-
-    // First check if the element implements ILayer
-    ILayer^ layerElement = dynamic_cast<ILayer^>(xamlElement);
-    if (layerElement) {
-        return layerElement->SublayerCanvas;
-    }
-
-    // Not an ILayer, so default to grabbing the xamlElement's SublayerCanvasProperty (if it exists)
-    return dynamic_cast<Canvas^>(GetXamlElement(node)->GetValue(Layer::SublayerCanvasProperty));
-};
-
 __inline CoreAnimation::EventedStoryboard^ GetStoryboard(DisplayAnimation* anim) {
     return (CoreAnimation::EventedStoryboard^)(Platform::Object^)anim->_xamlAnimation;
 }
@@ -196,8 +181,12 @@ void DisplayAnimation::Stop() {
     _xamlAnimation = nullptr;
 }
 
-concurrency::task<void> DisplayAnimation::AddAnimation(DisplayNode& node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to) {
-    auto xamlNode = GetXamlElement(&node);
+__inline FrameworkElement^ _GetXamlElement(ILayerProxy& node) {
+    return dynamic_cast<FrameworkElement^>(reinterpret_cast<Platform::Object^>(reinterpret_cast<LayerProxy*>(&node)->GetXamlElement().Get()));
+};
+
+concurrency::task<void> DisplayAnimation::AddAnimation(ILayerProxy& node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to) {
+    auto xamlNode = _GetXamlElement(node);
     auto xamlAnimation = GetStoryboard(this);
 
     xamlAnimation->Animate(xamlNode,
@@ -208,8 +197,8 @@ concurrency::task<void> DisplayAnimation::AddAnimation(DisplayNode& node, const 
     return concurrency::task_from_result();
 }
 
-concurrency::task<void> DisplayAnimation::AddTransitionAnimation(DisplayNode& node, const char* type, const char* subtype) {
-    auto xamlNode = GetXamlElement(&node);
+concurrency::task<void> DisplayAnimation::AddTransitionAnimation(ILayerProxy& node, const char* type, const char* subtype) {
+    auto xamlNode = _GetXamlElement(node);
     auto xamlAnimation = GetStoryboard(this);
 
     std::string stype(type);
@@ -238,263 +227,6 @@ concurrency::task<void> DisplayAnimation::AddTransitionAnimation(DisplayNode& no
 
         Start();
     } , concurrency::task_continuation_context::use_current());
-}
-
-DisplayNode::DisplayNode(IInspectable* xamlElement) :
-    _xamlElement(nullptr),
-    _isRoot(false),
-    _parent(nullptr),
-    _currentTexture(nullptr),
-    _topMost(false) {
-
-    // If we weren't passed a xaml element, default to our Xaml CALayer representation
-    if (!xamlElement) {
-        _xamlElement = reinterpret_cast<IInspectable*>(ref new Layer());
-    } else {
-        _xamlElement = xamlElement;
-    }
-
-    // Initialize the UIElement with CoreAnimation
-    CoreAnimation::LayerProperties::InitializeFrameworkElement(GetXamlElement(this));
-}
-
-DisplayNode::~DisplayNode() {
-    for (auto curNode : _subnodes) {
-        curNode->_parent = NULL;
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////////////
-// TODO: This should just happen in UIWindow.mm and should get deleted from here
-void DisplayNode::SetNodeZIndex(int zIndex) {
-    FrameworkElement^ xamlNode = GetXamlElement(this);
-    xamlNode->SetValue(Canvas::ZIndexProperty, zIndex);
-}
-///////////////////////////////////////////////////////////////////////////////////////
-
-void DisplayNode::SetProperty(const wchar_t* name, float value) {
-    FrameworkElement^ xamlNode = GetXamlElement(this);
-    CoreAnimation::LayerProperties::SetValue(xamlNode, ref new Platform::String(name), (double)value);
-}
-
-void DisplayNode::SetPropertyInt(const wchar_t* name, int value) {
-    FrameworkElement^ xamlNode = GetXamlElement(this);
-    CoreAnimation::LayerProperties::SetValue(xamlNode, ref new Platform::String(name), (int)value);
-}
-
-void DisplayNode::SetHidden(bool hidden) {
-    FrameworkElement^ xamlNode = GetXamlElement(this);
-    xamlNode->Visibility = (hidden ? Visibility::Collapsed : Visibility::Visible);
-}
-
-void DisplayNode::SetMasksToBounds(bool masksToBounds) {
-    FrameworkElement^ xamlNode = GetXamlElement(this);
-    CoreAnimation::LayerProperties::SetValue(xamlNode, "masksToBounds", masksToBounds);
-}
-
-float DisplayNode::_GetPresentationPropertyValue(const char* name) {
-    FrameworkElement^ xamlNode = GetXamlElement(this);
-    std::string str(name);
-    std::wstring wstr(str.begin(), str.end());
-    return (float)(double)CoreAnimation::LayerProperties::GetValue(xamlNode, ref new Platform::String(wstr.data()));
-}
-
-void DisplayNode::SetContentsCenter(float x, float y, float width, float height) {
-    FrameworkElement^ xamlNode = GetXamlElement(this);
-    CoreAnimation::LayerProperties::SetContentCenter(xamlNode, Rect(x, y, width, height));
-}
-
-/////////////////////////////////////////////////////////////
-// TODO: FIND A WAY TO REMOVE THIS?
-void DisplayNode::SetTopMost() {
-    FrameworkElement^ xamlNode = GetXamlElement(this);
-    _topMost = true;
-    // xamlNode->SetTopMost();
-    // Worst case, this becomes:
-    // xamlNode -> _SetContent(nullptr);
-    // xamlNode -> __super::Background = nullptr;
-}
-
-void DisplayNode::SetBackgroundColor(float r, float g, float b, float a) {
-    FrameworkElement^ xamlNode = GetXamlElement(this);
-
-    SolidColorBrush^ backgroundBrush = nullptr; // A null brush is transparent and not hit-testable
-    if (!_isRoot && !_topMost && (a != 0.0)) {
-        Windows::UI::Color backgroundColor;
-        backgroundColor.R = static_cast<unsigned char>(r * 255.0);
-        backgroundColor.G = static_cast<unsigned char>(g * 255.0);
-        backgroundColor.B = static_cast<unsigned char>(b * 255.0);
-        backgroundColor.A = static_cast<unsigned char>(a * 255.0);
-        backgroundBrush = ref new SolidColorBrush(backgroundColor);
-    }
-
-    // Panel and Control each have a Background property that we can set
-    if (Panel^ panel = dynamic_cast<Panel^>(xamlNode)) {
-        panel->Background = backgroundBrush;
-    } else if (Control^ control = dynamic_cast<Control^>(xamlNode)) {
-        control->Background = backgroundBrush;
-    } else {
-        UNIMPLEMENTED_WITH_MSG(
-            "SetBackgroundColor not supported on this Xaml element: [%ws].",
-            xamlNode->GetType()->FullName->Data());
-    }
-}
-
-void DisplayNode::SetShouldRasterize(bool rasterize) {
-    FrameworkElement^ xamlNode = GetXamlElement(this);
-    if (rasterize) {
-        xamlNode->CacheMode = ref new Media::BitmapCache();
-    } else if (xamlNode->CacheMode) {
-        xamlNode->CacheMode = nullptr;
-    }
-}
-
-void DisplayNode::SetContents(const Microsoft::WRL::ComPtr<IInspectable>& bitmap, float width, float height, float scale) {
-    FrameworkElement^ xamlNode = GetXamlElement(this);
-    if (bitmap) {
-        auto content = dynamic_cast<Media::ImageSource^>(reinterpret_cast<Platform::Object^>(bitmap.Get()));
-        CoreAnimation::LayerProperties::SetContent(xamlNode, content, width, height, scale);
-    } else {
-        CoreAnimation::LayerProperties::SetContent(xamlNode, nullptr, width, height, scale);
-    }
-}
-
-void DisplayNode::AddToRoot() {
-    FrameworkElement^ xamlNode = GetXamlElement(this);
-    windowCollection->Children->Append(xamlNode);
-    SetMasksToBounds(true);
-    _isRoot = true;
-}
-
-void DisplayNode::AddSubnode(const std::shared_ptr<DisplayNode>& subNode, const std::shared_ptr<DisplayNode>& before, const std::shared_ptr<DisplayNode>& after) {
-    assert(subNode->_parent == NULL);
-    subNode->_parent = this;
-    _subnodes.insert(subNode);
-
-    FrameworkElement^ xamlElementForSubNode = GetXamlElement(subNode.get());
-    Panel^ subLayerPanelForThisNode = GetSubLayerPanel(this);
-    if (!subLayerPanelForThisNode) {
-        UNIMPLEMENTED_WITH_MSG(
-            "AddSubNode not supported on this Xaml element: [%ws].", 
-            GetXamlElement(this)->GetType()->FullName->Data());
-        return;
-    }
-
-    if (before == NULL && after == NULL) {
-        subLayerPanelForThisNode->Children->Append(xamlElementForSubNode);
-    } else if (before != NULL) {
-        FrameworkElement^ xamlBeforeNode = GetXamlElement(before.get());
-        unsigned int idx = 0;
-        if (subLayerPanelForThisNode->Children->IndexOf(xamlBeforeNode, &idx) == true) {
-            subLayerPanelForThisNode->Children->InsertAt(idx, xamlElementForSubNode);
-        } else {
-            FAIL_FAST();
-        }
-    } else if (after != NULL) {
-        FrameworkElement^ xamlAfterNode = GetXamlElement(after.get());
-        unsigned int idx = 0;
-        if (subLayerPanelForThisNode->Children->IndexOf(xamlAfterNode, &idx) == true) {
-            subLayerPanelForThisNode->Children->InsertAt(idx + 1, xamlElementForSubNode);
-        } else {
-            FAIL_FAST();
-        }
-    }
-
-    subLayerPanelForThisNode->InvalidateArrange();
-}
-
-void DisplayNode::MoveNode(const std::shared_ptr<DisplayNode>& before, const std::shared_ptr<DisplayNode>& after) {
-    assert(_parent != NULL);
-
-    FrameworkElement^ xamlElementForThisNode = GetXamlElement(this);
-    Panel^ subLayerPanelForParentNode = GetSubLayerPanel(_parent);
-    if (!subLayerPanelForParentNode) {
-        FrameworkElement^ xamlElementForParentNode = GetXamlElement(_parent);
-        UNIMPLEMENTED_WITH_MSG(
-            "MoveNode for [%ws] not supported on parent [%ws].",
-            xamlElementForThisNode->GetType()->FullName->Data(),
-            xamlElementForParentNode->GetType()->FullName->Data());
-        return;
-    }
-
-    if (before != NULL) {
-        FrameworkElement^ xamlBeforeNode = GetXamlElement(before.get());
-
-        unsigned int srcIdx = 0;
-        if (subLayerPanelForParentNode->Children->IndexOf(xamlElementForThisNode, &srcIdx) == true) {
-            unsigned int destIdx = 0;
-            if (subLayerPanelForParentNode->Children->IndexOf(xamlBeforeNode, &destIdx) == true) {
-                if (srcIdx == destIdx)
-                    return;
-
-                if (srcIdx < destIdx)
-                    destIdx--;
-
-                subLayerPanelForParentNode->Children->RemoveAt(srcIdx);
-                subLayerPanelForParentNode->Children->InsertAt(destIdx, xamlElementForThisNode);
-            } else {
-                FAIL_FAST();
-            }
-        } else {
-            FAIL_FAST();
-        }
-    } else {
-        assert(after != NULL);
-
-        FrameworkElement^ xamlAfterNode = GetXamlElement(after.get());
-        unsigned int srcIdx = 0;
-        if (subLayerPanelForParentNode->Children->IndexOf(xamlElementForThisNode, &srcIdx) == true) {
-            unsigned int destIdx = 0;
-            if (subLayerPanelForParentNode->Children->IndexOf(xamlAfterNode, &destIdx) == true) {
-                if (srcIdx == destIdx)
-                    return;
-
-                if (srcIdx < destIdx)
-                    destIdx--;
-
-                subLayerPanelForParentNode->Children->RemoveAt(srcIdx);
-                subLayerPanelForParentNode->Children->InsertAt(destIdx + 1, xamlElementForThisNode);
-            } else {
-                FAIL_FAST();
-            }
-        } else {
-            FAIL_FAST();
-        }
-    }
-}
-
-void DisplayNode::RemoveFromSupernode() {
-    FrameworkElement^ xamlElementForThisNode = GetXamlElement(this);
-    Panel^ subLayerPanelForParentNode;
-    if (_isRoot) {
-        subLayerPanelForParentNode = (Panel^)(Platform::Object^)windowCollection;
-    } else {
-        if (!_parent) {
-            return;
-        }
-
-        subLayerPanelForParentNode = GetSubLayerPanel(_parent);
-        _parent->_subnodes.erase(shared_from_this());
-    }
-
-    if (!subLayerPanelForParentNode) {
-        FrameworkElement^ xamlElementForParentNode = GetXamlElement(_parent);
-        UNIMPLEMENTED_WITH_MSG(
-            "RemoveFromSupernode for [%ws] not supported on parent [%ws].",
-            xamlElementForThisNode->GetType()->FullName->Data(),
-            xamlElementForParentNode->GetType()->FullName->Data());
-
-        return;
-    }
-
-    _parent = nullptr;
-
-    unsigned int idx = 0;
-    if (subLayerPanelForParentNode->Children->IndexOf(xamlElementForThisNode, &idx) == true) {
-        subLayerPanelForParentNode->Children->RemoveAt(idx);
-    } else {
-        FAIL_FAST();
-    }
 }
 
 ComPtr<IInspectable> CreateBitmapFromImageData(const void* ptr, int len) {
@@ -595,7 +327,7 @@ extern "C" void SetXamlRoot(Windows::UI::Xaml::Controls::Grid^ grid, ActivationT
 void DispatchCompositorTransactions(
     std::deque<std::shared_ptr<ICompositorTransaction>>&& subTransactions,
     std::deque<std::shared_ptr<ICompositorAnimationTransaction>>&& animationTransactions,
-    std::map<std::shared_ptr<DisplayNode>, std::map<std::string, std::shared_ptr<ICompositorTransaction>>>&& propertyTransactions,
+    std::map<std::shared_ptr<ILayerProxy>, std::map<std::string, std::shared_ptr<ICompositorTransaction>>>&& propertyTransactions,
     std::deque<std::shared_ptr<ICompositorTransaction>>&& movementTransactions) {
 
     // Walk and process the list of subtransactions
@@ -613,7 +345,7 @@ void DispatchCompositorTransactions(
         }, concurrency::task_continuation_context::use_current());
     }
 
-    // Walk and process the map of queued properties per DisplayNode and the list of node movements as a single distinct task
+    // Walk and process the map of queued properties per ILayerProxy and the list of node movements as a single distinct task
     s_compositorTransactions = s_compositorTransactions
         .then([movementTransactions = std::move(movementTransactions),
             propertyTransactions = std::move(propertyTransactions)]() noexcept {
@@ -622,7 +354,7 @@ void DispatchCompositorTransactions(
         }
 
         for (auto& nodeProperties : propertyTransactions) {
-            // Walk the map of queued properties for this DisplayNode
+            // Walk the map of queued properties for this ILayerProxy
             for (auto& nodeProperty : nodeProperties.second) {
                 nodeProperty.second->Process();
             }

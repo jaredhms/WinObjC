@@ -195,7 +195,7 @@ __declspec(thread) CATransaction* _curTransaction, *_rootTransaction;
 
 + (void)_setPropertyForLayer:(CALayer*)layer name:(NSString*)propertyName value:(NSObject*)newValue {
     GetCACompositor()->setDisplayProperty([self _currentTransaction]->_transactionQueue,
-                                          [layer _priv]->_presentationNode,
+                                          [layer _layerProxy],
                                           [propertyName UTF8String],
                                           newValue);
     [layer _displayChanged];
@@ -206,51 +206,51 @@ __declspec(thread) CATransaction* _curTransaction, *_rootTransaction;
 }
 
 + (void)_addSublayerToTop:(CALayer*)layer {
-    GetCACompositor()->addNode([self _currentTransaction]->_transactionQueue, [layer _priv]->_presentationNode, NULL, NULL, NULL);
+    GetCACompositor()->addNode([self _currentTransaction]->_transactionQueue, [layer _layerProxy], NULL, NULL, NULL);
 }
 
 + (void)_addSublayerToLayer:(CALayer*)layer sublayer:(CALayer*)sublayer {
     GetCACompositor()->addNode([self _currentTransaction]->_transactionQueue,
-                               [sublayer _priv]->_presentationNode,
-                               [layer _priv]->_presentationNode,
+                               [sublayer _layerProxy],
+                               [layer _layerProxy],
                                NULL,
                                NULL);
 }
 
 + (void)_addSublayerToLayer:(CALayer*)layer sublayer:(CALayer*)sublayer before:(CALayer*)before {
     GetCACompositor()->addNode([self _currentTransaction]->_transactionQueue,
-                               [sublayer _priv]->_presentationNode,
-                               [layer _priv]->_presentationNode,
-                               [before _priv]->_presentationNode,
+                               [sublayer _layerProxy],
+                               [layer _layerProxy],
+                               [before _layerProxy],
                                NULL);
 }
 
 + (void)_addSublayerToLayer:(CALayer*)layer sublayer:(CALayer*)sublayer after:(CALayer*)after {
     GetCACompositor()->addNode([self _currentTransaction]->_transactionQueue,
-                               [sublayer _priv]->_presentationNode,
-                               [layer _priv]->_presentationNode,
+                               [sublayer _layerProxy],
+                               [layer _layerProxy],
                                NULL,
-                               [after _priv]->_presentationNode);
+                               [after _layerProxy]);
 }
 
 + (void)_replaceInLayer:(CALayer*)layer sublayer:(CALayer*)sublayer withSublayer:(CALayer*)newlayer {
     GetCACompositor()->addNode([self _currentTransaction]->_transactionQueue,
-                               [newlayer _priv]->_presentationNode,
-                               [layer _priv]->_presentationNode,
-                               [sublayer _priv]->_presentationNode,
+                               [newlayer _layerProxy],
+                               [layer _layerProxy],
+                               [sublayer _layerProxy],
                                NULL);
-    GetCACompositor()->removeNode([self _currentTransaction]->_transactionQueue, [sublayer _priv]->_presentationNode);
+    GetCACompositor()->removeNode([self _currentTransaction]->_transactionQueue, [sublayer _layerProxy]);
 }
 
 + (void)_moveLayer:(CALayer*)layer beforeLayer:(CALayer*)before afterLayer:(CALayer*)after {
     GetCACompositor()->moveNode([self _currentTransaction]->_transactionQueue,
-                                [layer _priv]->_presentationNode,
-                                before ? [before _priv]->_presentationNode : NULL,
-                                after ? [after _priv]->_presentationNode : NULL);
+                                [layer _layerProxy],
+                                before ? [before _layerProxy] : NULL,
+                                after ? [after _layerProxy] : NULL);
 }
 
 + (void)_removeLayer:(CALayer*)layer {
-    GetCACompositor()->removeNode([self _currentTransaction]->_transactionQueue, [layer _priv]->_presentationNode);
+    GetCACompositor()->removeNode([self _currentTransaction]->_transactionQueue, [layer _layerProxy]);
 }
 
 + (void)_addAnimationToLayer:(CALayer*)layer animation:(CAAnimation*)anim forKey:(NSString*)key {

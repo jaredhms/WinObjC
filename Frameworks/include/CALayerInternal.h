@@ -44,7 +44,7 @@ public:
     float opacity;
 };
 
-class DisplayNode;
+struct ILayerProxy;
 class DisplayTexture;
 @class CALayer;
 
@@ -66,7 +66,7 @@ public:
 
     BOOL _shouldRasterize;
 
-    std::shared_ptr<DisplayNode> _presentationNode;
+    std::shared_ptr<ILayerProxy> _layerProxy;
 
     // The XAML element backing this CALayer
     StrongId<WXFrameworkElement> _xamlElement;
@@ -100,7 +100,7 @@ public:
 - (void)_setShouldLayout;
 - (void)setContentsOrientation:(UIImageOrientation)orientation;
 - (UIImageOrientation)contentsOrientation;
-- (std::shared_ptr<DisplayNode>)_presentationNode;
+- (std::shared_ptr<ILayerProxy>)_layerProxy;
 - (void)_releaseContents:(BOOL)immediately;
 
 // Some additional non-standard layer swapping functionality:

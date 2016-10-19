@@ -22,7 +22,6 @@
 #include "winobjc\winobjc.h"
 #include <ppltasks.h>
 
-class DisplayNode;
 class DisplayTexture;
 class DisplayAnimation;
 
@@ -51,18 +50,18 @@ public:
     virtual ~DisplayAnimation(){};
 
     virtual void Completed() = 0;
-    // TODO: CAN WE DO const DisplayNode&????
-    virtual concurrency::task<void> AddToNode(DisplayNode& node) = 0;
+    // TODO: CAN WE DO const ILayerProxy&????
+    virtual concurrency::task<void> AddToNode(ILayerProxy& node) = 0;
 
     void CreateXamlAnimation();
     void Start();
     void Stop();
 
-    // TODO: CAN WE DO const DisplayNode&????
+    // TODO: CAN WE DO const ILayerProxy&????
     concurrency::task<void> AddAnimation(
-        DisplayNode& node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to);
-    // TODO: CAN WE DO const DisplayNode&????
-    concurrency::task<void> AddTransitionAnimation(DisplayNode& node, const char* type, const char* subtype);
+        ILayerProxy& node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to);
+    // TODO: CAN WE DO const ILayerProxy&????
+    concurrency::task<void> AddTransitionAnimation(ILayerProxy& node, const char* type, const char* subtype);
 };
 
 class DisplayTexture {
@@ -75,63 +74,6 @@ protected:
 };
 
 class CAXamlCompositor;
-
-// A DisplayNode is CALayer's proxy to its backing Xaml FrameworkElement.  DisplayNodes
-// are used to update the Xaml FrameworkElement's visual state (positioning, animations, etc.) based upon CALayer API calls,
-// and it's also responsible for the CALayer's sublayer management (*if* that backing Xaml FrameworkElement supports sublayers).
-// When constructed, the DisplayNode inspects the passed-in Xaml FrameworkElement, and lights up all CALayer functionality that's
-// supported by the given FrameworkElement.
-class DisplayNode : public std::enable_shared_from_this<DisplayNode> {
-public:
-    // The Xaml element that backs this DisplayNode
-    Microsoft::WRL::ComPtr<IInspectable> _xamlElement;
-
-    explicit DisplayNode(IInspectable* xamlElement);
-    ~DisplayNode();
-
-    // Display properties
-    void SetProperty(const wchar_t* name, float value);
-    void SetPropertyInt(const wchar_t* name, int value);
-    void SetHidden(bool hidden);
-    void SetMasksToBounds(bool masksToBounds);
-    void SetBackgroundColor(float r, float g, float b, float a);
-    void SetTexture(const std::shared_ptr<DisplayTexture>& texture, float width, float height, float scale);
-    void SetContents(const Microsoft::WRL::ComPtr<IInspectable>& bitmap, float width, float height, float scale);
-    void SetContentsCenter(float x, float y, float width, float height);
-    void SetShouldRasterize(bool shouldRasterize);
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    // TODO: SHOULD REMOVE AND JUST DO ON UIWINDOW'S CANVAS
-    void SetNodeZIndex(int zIndex);
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    // TODO: CAN/SHOULD WE REMOVE THIS?
-    void SetTopMost();
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    // General property management
-    void* GetProperty(const char* name);
-    void UpdateProperty(const char* name, void* value);
-
-    // Sublayer management
-    void AddToRoot();
-    void AddSubnode(const std::shared_ptr<DisplayNode>& subNode,
-                    const std::shared_ptr<DisplayNode>& before,
-                    const std::shared_ptr<DisplayNode>& after);
-    void MoveNode(const std::shared_ptr<DisplayNode>& before, const std::shared_ptr<DisplayNode>& after);
-    void RemoveFromSupernode();
-
-protected:
-    // Property management
-    float _GetPresentationPropertyValue(const char* name);
-
-    bool _isRoot;
-    DisplayNode* _parent;
-    std::set<std::shared_ptr<DisplayNode>> _subnodes;
-    std::shared_ptr<DisplayTexture> _currentTexture;
-    bool _topMost;
-};
 
 struct ICompositorTransaction {
 public:
@@ -151,5 +93,5 @@ public:
 void DispatchCompositorTransactions(
     std::deque<std::shared_ptr<ICompositorTransaction>>&& subTransactions,
     std::deque<std::shared_ptr<ICompositorAnimationTransaction>>&& animationTransactions,
-    std::map<std::shared_ptr<DisplayNode>, std::map<std::string, std::shared_ptr<ICompositorTransaction>>>&& propertyTransactions,
+    std::map<std::shared_ptr<ILayerProxy>, std::map<std::string, std::shared_ptr<ICompositorTransaction>>>&& propertyTransactions,
     std::deque<std::shared_ptr<ICompositorTransaction>>&& movementTransactions);

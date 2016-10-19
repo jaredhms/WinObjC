@@ -107,7 +107,7 @@ static void initInternal(UIWindow* self, CGRect pos) {
     [ourLayer _setRootLayer:TRUE];
 
     [CATransaction _addSublayerToTop:ourLayer];
-    GetCACompositor()->setNodeTopMost([ourLayer _presentationNode], true);
+    GetCACompositor()->setNodeTopMost([ourLayer _layerProxy], true);
 
     [self setWindowLevel:UIWindowLevelNormal];
     [self setSizeUIWindowToFit:[[UIApplication displayMode] sizeUIWindowToFit]];
