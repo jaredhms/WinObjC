@@ -27,7 +27,7 @@ class CGContextImpl;
 COREGRAPHICS_EXPORT void EbrCenterTextInRectVertically(CGRect* rect, CGSize* textSize, id font);
 COREGRAPHICS_EXPORT CGContextRef _CGBitmapContextCreateWithTexture(int width,
                                                                    int height,
-                                                                   DisplayTexture* texture = NULL,
+                                                                   const std::shared_ptr<DisplayTexture>& texture ,
                                                                    DisplayTextureLocking* locking = NULL);
 COREGRAPHICS_EXPORT CGContextRef _CGBitmapContextCreateWithFormat(int width, int height, __CGSurfaceFormat fmt);
 COREGRAPHICS_EXPORT CGImageRef CGBitmapContextGetImage(CGContextRef ctx);

@@ -63,7 +63,7 @@ public:
 
     void setNodeTexture(const std::shared_ptr<DisplayTransaction>& transaction,
                         const std::shared_ptr<DisplayNode>& node,
-                        DisplayTexture* newTexture,
+                        const std::shared_ptr<DisplayTexture>& newTexture,
                         CGSize contentsSize,
                         float contentsScale) override {
     }
@@ -75,7 +75,7 @@ public:
     void setNodeTopMost(const std::shared_ptr<DisplayNode>& node, bool topMost) override {
     }
 
-    DisplayTexture* GetDisplayTextureForCGImage(CGImageRef img, bool create) override {
+    std::shared_ptr<DisplayTexture> GetDisplayTextureForCGImage(CGImageRef img, bool create) override {
         return nullptr;
     }
 
@@ -98,11 +98,6 @@ public:
                                                               NSString* subtype,
                                                               CAMediaTimingProperties* timingProperties) override {
         return nullptr;
-    }
-
-    void RetainDisplayTexture(DisplayTexture* tex) override {
-    }
-    void ReleaseDisplayTexture(DisplayTexture* tex) override {
     }
 
     bool isTablet() override {
@@ -139,13 +134,13 @@ public:
     void setTablet(bool isTablet) override {
     }
 
-    DisplayTexture* CreateWritableBitmapTexture32(int width, int height) override {
+    std::shared_ptr<DisplayTexture> CreateWritableBitmapTexture32(int width, int height) override {
         return nullptr;
     }
-    void* LockWritableBitmapTexture(DisplayTexture* tex, int* stride) override {
+    void* LockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& tex, int* stride) override {
         return nullptr;
     }
-    void UnlockWritableBitmapTexture(DisplayTexture* tex) override {
+    void UnlockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& tex) override {
     }
 
     void EnableDisplaySyncNotification() override {

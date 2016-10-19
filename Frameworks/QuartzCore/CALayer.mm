@@ -76,9 +76,6 @@ NSString* const kCAFilterTrilinear = @"kCAFilterTrilinear";
 @public
     CAPrivateInfo* priv;
 }
-
-- (DisplayTexture*)_getDisplayTexture;
-
 @end
 
 // FIXME(DH): Compatibility shim to avoid rewriting parts of CA for libobjc2.
@@ -194,7 +191,7 @@ static void DoDisplayList(CALayer* layer) {
 
         //////////////////////////////////////////////////////////////////////////////////
         // TODO: USE A shared_ptr!
-        DisplayTexture* newTexture = (DisplayTexture*)[cur->self _getDisplayTexture];
+        std::shared_ptr<DisplayTexture> newTexture = [cur->self _getDisplayTexture];
         cur->needsDisplay = FALSE;
         if (newTexture) {
             GetCACompositor()->setNodeTexture([CATransaction _currentDisplayTransaction],
@@ -202,7 +199,6 @@ static void DoDisplayList(CALayer* layer) {
                                               newTexture,
                                               cur->contentsSize,
                                               cur->contentsScale);
-            GetCACompositor()->ReleaseDisplayTexture(newTexture);
         }
 
         [cur->self _displayChanged];
@@ -299,38 +295,23 @@ CAPrivateInfo::~CAPrivateInfo() {
 
 class LockingBufferInterface : public DisplayTextureLocking {
 public:
-    void* LockWritableBitmapTexture(DisplayTexture* tex, int* stride) {
-        return GetCACompositor()->LockWritableBitmapTexture(tex, stride);
+    void* LockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& texture, int* stride) {
+        return GetCACompositor()->LockWritableBitmapTexture(texture, stride);
     }
-    void UnlockWritableBitmapTexture(DisplayTexture* tex) {
-        GetCACompositor()->UnlockWritableBitmapTexture(tex);
-    }
-
-    void RetainDisplayTexture(DisplayTexture* tex) {
-        GetCACompositor()->RetainDisplayTexture(tex);
-    }
-
-    void ReleaseDisplayTexture(DisplayTexture* tex) {
-        GetCACompositor()->ReleaseDisplayTexture(tex);
+    void UnlockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& texture) {
+        GetCACompositor()->UnlockWritableBitmapTexture(texture);
     }
 };
 
 static LockingBufferInterface _globallockingBufferInterface;
 
 CGContextRef CreateLayerContentsBitmapContext32(int width, int height) {
-    DisplayTexture* tex = NULL;
-
     if ([NSThread isMainThread]) {
-        tex = GetCACompositor()->CreateWritableBitmapTexture32(width, height);
+        std::shared_ptr<DisplayTexture> texture = GetCACompositor()->CreateWritableBitmapTexture32(width, height);
+        return _CGBitmapContextCreateWithTexture(width, height, texture, &_globallockingBufferInterface);
     }
 
-    CGContextRef ret = _CGBitmapContextCreateWithTexture(width, height, tex, &_globallockingBufferInterface);
-
-    if (tex) {
-        _globallockingBufferInterface.ReleaseDisplayTexture(tex);
-    }
-
-    return ret;
+    return nil;
 }
 
 @implementation CALayer
@@ -1862,18 +1843,16 @@ static void doRecursiveAction(CALayer* layer, NSString* actionName) {
     return nil;
 }
 
-- (DisplayTexture*)_getDisplayTexture {
+- (std::shared_ptr<DisplayTexture>)_getDisplayTexture {
     //  Update if needed
     [self displayIfNeeded];
 
-    DisplayTexture* ourTexture = NULL;
-
-    //  Create a texture
+    //  Create and return a texture if we have contents
     if (priv->contents) {
-        ourTexture = GetCACompositor()->GetDisplayTextureForCGImage(priv->contents, true);
+        return GetCACompositor()->GetDisplayTextureForCGImage(priv->contents, true);
     }
 
-    return ourTexture;
+    return nullptr;
 }
 
 /**

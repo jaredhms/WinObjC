@@ -115,7 +115,7 @@ public:
 + (CGPoint)convertPoint:(CGPoint)point fromLayer:(CALayer*)layer toLayer:(CALayer*)layer;
 
 - (void)_removeAnimation:(CAAnimation*)animation;
-- (DisplayTexture*)_getDisplayTexture;
+- (std::shared_ptr<DisplayTexture>)_getDisplayTexture;
 
 - (CAPrivateInfo*)_priv;
 - (void)_setRootLayer:(BOOL)isRootLayer;

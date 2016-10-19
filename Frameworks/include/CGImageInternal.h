@@ -30,10 +30,8 @@ class DisplayTexture;
 
 class DisplayTextureLocking {
 public:
-    virtual void* LockWritableBitmapTexture(DisplayTexture* tex, int* stride) = 0;
-    virtual void UnlockWritableBitmapTexture(DisplayTexture* tex) = 0;
-    virtual void RetainDisplayTexture(DisplayTexture* tex) = 0;
-    virtual void ReleaseDisplayTexture(DisplayTexture* tex) = 0;
+    virtual void* LockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& tex, int* stride) = 0;
+    virtual void UnlockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& tex) = 0;
 };
 
 class CGImageBacking {
@@ -68,7 +66,7 @@ public:
     virtual cairo_surface_t* LockCairoSurface() = 0;
     virtual void ReleaseCairoSurface() = 0;
     virtual void SetFreeWhenDone(bool freeWhenDone) = 0;
-    virtual DisplayTexture* GetDisplayTexture() {
+    virtual std::shared_ptr<DisplayTexture> GetDisplayTexture() {
         return NULL;
     }
 

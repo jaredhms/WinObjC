@@ -66,7 +66,7 @@ public:
                                     NSObject* newValue) = 0;
     virtual void setNodeTexture(const std::shared_ptr<DisplayTransaction>& transaction,
                                 const std::shared_ptr<DisplayNode>& node,
-                                DisplayTexture* newTexture,
+                                const std::shared_ptr<DisplayTexture>& newTexture,
                                 CGSize contentsSize,
                                 float contentsScale) = 0;
     virtual NSObject* getDisplayProperty(const std::shared_ptr<DisplayNode>& node, const char* propertyName = NULL) = 0;
@@ -74,14 +74,14 @@ public:
     virtual void SetShouldRasterize(const std::shared_ptr<DisplayNode>& node, bool rasterize) = 0;
 
     // DisplayTextures
-    virtual DisplayTexture* GetDisplayTextureForCGImage(CGImageRef img, bool create) = 0;
+    virtual std::shared_ptr<DisplayTexture> GetDisplayTextureForCGImage(CGImageRef img, bool create) = 0;
     virtual Microsoft::WRL::ComPtr<IInspectable> GetBitmapForCGImage(CGImageRef img) = 0;
 
     ////////////////////////////////////////////////////////////////////////
     // TODO: Move to some bitmap/texture helper API?
-    virtual DisplayTexture* CreateWritableBitmapTexture32(int width, int height) = 0;
-    virtual void* LockWritableBitmapTexture(DisplayTexture* tex, int* stride) = 0;
-    virtual void UnlockWritableBitmapTexture(DisplayTexture* tex) = 0;
+    virtual std::shared_ptr<DisplayTexture> CreateWritableBitmapTexture32(int width, int height) = 0;
+    virtual void* LockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& texture, int* stride) = 0;
+    virtual void UnlockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& texture) = 0;
 
     // Animations
     virtual void addAnimation(const std::shared_ptr<DisplayTransaction>& transaction, id layer, id animation, id forKey) = 0;
@@ -98,12 +98,6 @@ public:
                                                                       NSString* type,
                                                                       NSString* subtype,
                                                                       CAMediaTimingProperties* timingProperties) = 0;
-
-    ////////////////////////////////////////////////////////////////////////
-    // TODO: Switch to shared_ptr for alla these
-    virtual void RetainDisplayTexture(DisplayTexture* tex) = 0;
-    virtual void ReleaseDisplayTexture(DisplayTexture* tex) = 0;
-    ////////////////////////////////////////////////////////////////////////
 
     ////////////////////////////////////////////////////////////////////////
     // TODO: Move to some screen/device API

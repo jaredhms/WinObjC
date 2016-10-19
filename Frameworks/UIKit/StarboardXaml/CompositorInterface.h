@@ -33,81 +33,6 @@ typedef enum {
 
 void CreateXamlCompositor(winobjc::Id& root, CompositionMode compositionMode);
 
-template <class T>
-class RefCounted;
-
-class RefCountedType {
-    template <class T>
-    friend class RefCounted;
-    int refCount;
-
-public:
-    void AddRef();
-    void Release();
-
-protected:
-    RefCountedType();
-    virtual ~RefCountedType();
-};
-
-template <class T>
-class RefCounted {
-private:
-    T* _ptr;
-
-public:
-    RefCounted() {
-        _ptr = NULL;
-    }
-    RefCounted(T* ptr) {
-        _ptr = ptr;
-        if (_ptr)
-            _ptr->AddRef();
-    }
-
-    RefCounted(const RefCounted& copy) {
-        _ptr = copy._ptr;
-        if (_ptr)
-            _ptr->AddRef();
-    }
-
-    ~RefCounted() {
-        if (_ptr)
-            _ptr->Release();
-        _ptr = NULL;
-    }
-    RefCounted& operator=(const RefCounted& val) {
-        if (_ptr == val._ptr)
-            return *this;
-        T* oldPtr = _ptr;
-        _ptr = val._ptr;
-        if (_ptr)
-            _ptr->AddRef();
-        if (oldPtr)
-            oldPtr->Release();
-
-        return *this;
-    }
-
-    T* operator->() {
-        return _ptr;
-    }
-
-    T* Get() {
-        return _ptr;
-    }
-
-    operator bool() {
-        return _ptr != NULL;
-    }
-
-    bool operator<(const RefCounted& other) const {
-        return _ptr < other._ptr;
-    }
-};
-
-typedef RefCounted<DisplayTexture> DisplayTextureRef;
-
 class DisplayAnimation : public std::enable_shared_from_this<DisplayAnimation> {
 public:
     winobjc::Id _xamlAnimation;
@@ -140,7 +65,7 @@ public:
     concurrency::task<void> AddTransitionAnimation(DisplayNode& node, const char* type, const char* subtype);
 };
 
-class DisplayTexture : public RefCountedType {
+class DisplayTexture {
 public:
     virtual ~DisplayTexture(){};
     virtual const Microsoft::WRL::ComPtr<IInspectable>& GetContent() const = 0;
@@ -170,7 +95,7 @@ public:
     void SetHidden(bool hidden);
     void SetMasksToBounds(bool masksToBounds);
     void SetBackgroundColor(float r, float g, float b, float a);
-    void SetTexture(DisplayTexture* texture, float width, float height, float scale);
+    void SetTexture(const std::shared_ptr<DisplayTexture>& texture, float width, float height, float scale);
     void SetContents(const Microsoft::WRL::ComPtr<IInspectable>& bitmap, float width, float height, float scale);
     void SetContentsCenter(float x, float y, float width, float height);
     void SetShouldRasterize(bool shouldRasterize);
@@ -204,7 +129,7 @@ protected:
     bool _isRoot;
     DisplayNode* _parent;
     std::set<std::shared_ptr<DisplayNode>> _subnodes;
-    DisplayTextureRef _currentTexture;
+    std::shared_ptr<DisplayTexture> _currentTexture;
     bool _topMost;
 };
 

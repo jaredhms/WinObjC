@@ -23,7 +23,7 @@ class CGGraphicBufferImage : public __CGImage {
 public:
     CGGraphicBufferImage(int width, int height, __CGSurfaceFormat fmt);
     CGGraphicBufferImage(const __CGSurfaceInfo& surfaceInfo);
-    CGGraphicBufferImage(const __CGSurfaceInfo& surfaceInfo, DisplayTexture* nativeTexture, DisplayTextureLocking* locking);
+    CGGraphicBufferImage(const __CGSurfaceInfo& surfaceInfo, const std::shared_ptr<DisplayTexture>& nativeTexture, DisplayTextureLocking* locking);
 };
 
 class EbrFastTexture;
@@ -42,10 +42,10 @@ private:
     DWORD _bitsPerComponent;
 
 public:
-    DisplayTexture* _nativeTexture;
+    std::shared_ptr<DisplayTexture> _nativeTexture;
     DisplayTextureLocking* _nativeTextureLocking;
 
-    CGGraphicBufferImageBacking(const __CGSurfaceInfo& surfaceInfo, DisplayTexture* nativeTexture, DisplayTextureLocking* locking);
+    CGGraphicBufferImageBacking(const __CGSurfaceInfo& surfaceInfo, const std::shared_ptr<DisplayTexture>& nativeTexture, DisplayTextureLocking* locking);
     ~CGGraphicBufferImageBacking();
 
     CGImageRef Copy();
@@ -69,5 +69,5 @@ public:
     cairo_surface_t* LockCairoSurface();
     void ReleaseCairoSurface();
     void SetFreeWhenDone(bool freeWhenDone);
-    DisplayTexture* GetDisplayTexture();
+    std::shared_ptr<DisplayTexture> GetDisplayTexture();
 };

@@ -91,54 +91,34 @@ void OnRenderedFrame() {
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::mutex _displayTextureCacheLock;
-std::map<CGImageRef, DisplayTextureRef> _displayTextureCache;
+std::map<CGImageRef, std::shared_ptr<DisplayTexture>> _displayTextureCache;
 
-DisplayTextureRef CachedDisplayTextureForImage(CGImageRef img) {
-    DisplayTextureRef ret = NULL;
+std::shared_ptr<DisplayTexture> CachedDisplayTextureForImage(CGImageRef img) {
+    std::shared_ptr<DisplayTexture> ret;
     _displayTextureCacheLock.lock();
-    auto texRef = _displayTextureCache.find(img);
-    if (texRef != _displayTextureCache.end()) {
-        ret = texRef->second;
+    auto cachedEntry = _displayTextureCache.find(img);
+    if (cachedEntry != _displayTextureCache.end()) {
+        ret = cachedEntry->second;
     }
     _displayTextureCacheLock.unlock();
 
     return ret;
 }
 
-void SetCachedDisplayTextureForImage(CGImageRef img, DisplayTexture* texture) {
+void SetCachedDisplayTextureForImage(CGImageRef img, const std::shared_ptr<DisplayTexture>& texture) {
     _displayTextureCacheLock.lock();
     if (!texture) {
-        auto texRef = _displayTextureCache.find(img);
-        if (texRef != _displayTextureCache.end()) {
-            _displayTextureCache.erase(texRef);
-        }
+        // Clear the cache if the texture is nullptr
+        _displayTextureCache.erase(img);
     } else {
+        // Cache the texture
         _displayTextureCache[img] = texture;
     }
     _displayTextureCacheLock.unlock();
 }
 
 void UIReleaseDisplayTextureForCGImage(CGImageRef img) {
-    SetCachedDisplayTextureForImage(img, NULL);
-}
-
-void RefCountedType::AddRef() {
-    assert(refCount > 0 && refCount != 0xDDDDDDDD);
-    EbrIncrement(&refCount);
-}
-
-void RefCountedType::Release() {
-    assert(refCount > 0 && refCount != 0xDDDDDDDD);
-    if (EbrDecrement(&refCount) == 0) {
-        delete this;
-    }
-}
-
-RefCountedType::RefCountedType() {
-    refCount = 1;
-}
-
-RefCountedType::~RefCountedType() {
+    SetCachedDisplayTextureForImage(img, nullptr);
 }
 
 class DisplayTextureContent : public DisplayTexture {
@@ -826,7 +806,7 @@ public:
     }
 };
 
-void DisplayNode::SetTexture(DisplayTexture* texture, float width, float height, float contentScale) {
+void DisplayNode::SetTexture(const std::shared_ptr<DisplayTexture>& texture, float width, float height, float contentScale) {
     _currentTexture = texture;
     SetContents((texture ? texture->GetContent() : nullptr), width, height, contentScale);
 }
@@ -1032,12 +1012,12 @@ public:
     std::shared_ptr<DisplayNode> _node;
     char* _propertyName;
     NSObject* _propertyValue;
-    DisplayTextureRef _newTexture;
+    std::shared_ptr<DisplayTexture> _newTexture;
     CGSize _contentsSize;
     float _contentsScale;
     bool _applyingTexture;
 
-    QueuedProperty(const std::shared_ptr<DisplayNode>& node, DisplayTexture* newTexture, CGSize contentsSize, float contentsScale) {
+    QueuedProperty(const std::shared_ptr<DisplayNode>& node, const std::shared_ptr<DisplayTexture>& newTexture, CGSize contentsSize, float contentsScale) {
         _node = node;
         _propertyName = IwStrDup("contents");
         _propertyValue = NULL;
@@ -1067,7 +1047,7 @@ public:
 
     void Process() override {
         if (_applyingTexture) {
-            _node->SetTexture(_newTexture.Get(), _contentsSize.width, _contentsSize.height, _contentsScale);
+            _node->SetTexture(_newTexture, _contentsSize.width, _contentsSize.height, _contentsScale);
         } else {
             _node->UpdateProperty(_propertyName, _propertyValue);
         }
@@ -1221,7 +1201,7 @@ public:
 
     virtual void setNodeTexture(const std::shared_ptr<DisplayTransaction>& transaction,
                                 const std::shared_ptr<DisplayNode>& node,
-                                DisplayTexture* newTexture,
+                                const std::shared_ptr<DisplayTexture>& newTexture,
                                 CGSize contentsSize,
                                 float contentsScale) override {
         transaction->QueueProperty(std::make_shared<QueuedProperty>(node, newTexture, contentsSize, contentsScale));
@@ -1238,24 +1218,28 @@ public:
         node->SetTopMost();
     }
 
-    virtual DisplayTexture* GetDisplayTextureForCGImage(CGImageRef img, bool create) override {
+    virtual std::shared_ptr<DisplayTexture> GetDisplayTextureForCGImage(CGImageRef img, bool create) override {
         CGImageRetain(img);
-        DisplayTexture* ret = img->Backing()->GetDisplayTexture();
-        if (ret) {
-            ret->AddRef();
+        auto cleanup = wil::ScopeExit([img] {
             CGImageRelease(img);
-            return ret;
-        }
-        DisplayTextureRef cached = CachedDisplayTextureForImage(img);
-        if (cached) {
-            cached->AddRef();
-            return cached.Get();
+        });
+
+        // If the image has a backing texture, use it
+        std::shared_ptr<DisplayTexture> texture = img->Backing()->GetDisplayTexture();
+        if (texture) {
+            return texture;
         }
 
-        ret = new DisplayTextureContent(img);
-        SetCachedDisplayTextureForImage(img, ret);
-        CGImageRelease(img);
-        return ret;
+        // If we have a cached texture for this image, use it
+        texture = CachedDisplayTextureForImage(img);
+        if (texture) {
+            return texture;
+        }
+
+        // Else, create and cache a new texture
+        texture = std::make_shared<DisplayTextureContent>(img);
+        SetCachedDisplayTextureForImage(img, texture);
+        return texture;
     }
 
     virtual ComPtr<IInspectable> GetBitmapForCGImage(CGImageRef img) override {
@@ -1263,17 +1247,16 @@ public:
         return content->GetContent();
     }
 
-    DisplayTexture* CreateWritableBitmapTexture32(int width, int height) override {
-        DisplayTexture* ret = new DisplayTextureContent(width, height);
-        return ret;
+    std::shared_ptr<DisplayTexture> CreateWritableBitmapTexture32(int width, int height) override {
+        return std::make_shared<DisplayTextureContent>(width, height);
     }
 
-    void* LockWritableBitmapTexture(DisplayTexture* tex, int* stride) override {
-        return ((DisplayTextureContent*)tex)->LockWritableBitmap(stride);
+    void* LockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& tex, int* stride) override {
+        return reinterpret_cast<DisplayTextureContent*>(tex.get())->LockWritableBitmap(stride);
     }
 
-    void UnlockWritableBitmapTexture(DisplayTexture* tex) override {
-        ((DisplayTextureContent*)tex)->UnlockWritableBitmap();
+    void UnlockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& tex) override {
+        reinterpret_cast<DisplayTextureContent*>(tex.get())->UnlockWritableBitmap();
     }
 
     virtual std::shared_ptr<DisplayAnimation> GetBasicDisplayAnimation(id animobj,
@@ -1291,14 +1274,6 @@ public:
                                                                       NSString* subtypeStr,
                                                                       CAMediaTimingProperties* timingProperties) override {
         return std::make_shared<DisplayAnimationTransition>(animobj, typeStr, subtypeStr);
-    }
-
-    virtual void RetainDisplayTexture(DisplayTexture* tex) override {
-        tex->AddRef();
-    }
-
-    virtual void ReleaseDisplayTexture(DisplayTexture* tex) override {
-        tex->Release();
     }
 
     virtual bool isTablet() override {

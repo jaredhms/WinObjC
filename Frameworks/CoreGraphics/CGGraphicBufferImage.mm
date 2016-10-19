@@ -52,7 +52,7 @@ CGGraphicBufferImage::CGGraphicBufferImage(const __CGSurfaceInfo& surfaceInfo) {
 }
 
 CGGraphicBufferImage::CGGraphicBufferImage(const __CGSurfaceInfo& surfaceInfo,
-                                           DisplayTexture* nativeTexture,
+                                           const std::shared_ptr<DisplayTexture>& nativeTexture,
                                            DisplayTextureLocking* locking) {
     _img = new CGGraphicBufferImageBacking(surfaceInfo, nativeTexture, locking);
     _imgType = CGImageTypeGraphicBuffer;
@@ -60,7 +60,7 @@ CGGraphicBufferImage::CGGraphicBufferImage(const __CGSurfaceInfo& surfaceInfo,
 }
 
 CGGraphicBufferImageBacking::CGGraphicBufferImageBacking(const __CGSurfaceInfo& surfaceInfo,
-                                                         DisplayTexture* nativeTexture,
+                                                         const std::shared_ptr<DisplayTexture>& nativeTexture,
                                                          DisplayTextureLocking* locking) {
     EbrIncrement((volatile int*)&imgDataCount);
     TraceVerbose(TAG, L"Number of images: %d", imgDataCount);
@@ -81,12 +81,11 @@ CGGraphicBufferImageBacking::CGGraphicBufferImageBacking(const __CGSurfaceInfo& 
     _bytesPerRow = 0;
     _nativeTexture = nativeTexture;
     _nativeTextureLocking = locking;
-    _nativeTextureLocking->RetainDisplayTexture(_nativeTexture);
 }
 
 CGGraphicBufferImageBacking::~CGGraphicBufferImageBacking() {
     EbrDecrement((volatile int*)&imgDataCount);
-    TraceVerbose(TAG, L"Destroyed (freeing fasttexture 0x%x) - Number of images: %d", _nativeTexture, imgDataCount);
+    TraceVerbose(TAG, L"Destroyed (freeing fasttexture 0x%x) - Number of images: %d", _nativeTexture.get(), imgDataCount);
 
     while (_cairoLocks > 0) {
         TraceWarning(TAG, L"Warning: surface lock not released cnt=%d", _cairoLocks);
@@ -96,8 +95,6 @@ CGGraphicBufferImageBacking::~CGGraphicBufferImageBacking() {
         TraceWarning(TAG, L"Warning: image lock not released cnt=%d", _imageLocks);
         ReleaseImageData();
     }
-    if (_nativeTexture)
-        _nativeTextureLocking->ReleaseDisplayTexture(_nativeTexture);
 }
 
 CGContextImpl* CGGraphicBufferImageBacking::CreateDrawingContext(CGContextRef base) {
@@ -268,7 +265,7 @@ void CGGraphicBufferImageBacking::ReleaseCairoSurface() {
 void CGGraphicBufferImageBacking::SetFreeWhenDone(bool freeWhenDone) {
 }
 
-DisplayTexture* CGGraphicBufferImageBacking::GetDisplayTexture() {
+std::shared_ptr<DisplayTexture> CGGraphicBufferImageBacking::GetDisplayTexture() {
     while (_cairoLocks > 0) {
         TraceWarning(TAG, L"Warning: surface lock not released cnt=%d", _cairoLocks);
         ReleaseCairoSurface();

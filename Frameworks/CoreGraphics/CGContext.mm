@@ -1032,7 +1032,7 @@ CGImageRef CGBitmapContextGetImage(CGContextRef ctx) {
     return ctx->Backing()->DestImage();
 }
 
-CGContextRef _CGBitmapContextCreateWithTexture(int width, int height, DisplayTexture* texture, DisplayTextureLocking* locking) {
+CGContextRef _CGBitmapContextCreateWithTexture(int width, int height, const std::shared_ptr<DisplayTexture>& texture, DisplayTextureLocking* locking) {
     CGImageRef newImage = nullptr;
     __CGSurfaceInfo surfaceInfo = _CGSurfaceInfoInit(width, height, _ColorARGB);
 

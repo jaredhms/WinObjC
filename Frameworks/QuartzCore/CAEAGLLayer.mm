@@ -74,7 +74,7 @@
     return _swapChainPanel;
 }
 
-- (DisplayTexture*)_getDisplayTexture {
+- (std::shared_ptr<DisplayTexture>)_getDisplayTexture {
     return NULL;
 }
 
