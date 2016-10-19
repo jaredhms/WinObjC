@@ -1786,7 +1786,7 @@ static UIInterfaceOrientation findOrientation(UIViewController* self) {
     Microsoft::WRL::ComPtr<IInspectable> pageObj = nullptr;
     auto xamlType = ReturnXamlType(priv->_xamlClassName);
     xamlType->ActivateInstance(pageObj.GetAddressOf());
-    [_pageMappings setObject:self forKey:(id)(void *)pageObj.Get()];
+    [_pageMappings setObject:self forKey:(id)(void*)pageObj.Get()];
 
     // Create a template UIView
     priv->_page = CreateRtProxy([WXCPage class], pageObj.Get());

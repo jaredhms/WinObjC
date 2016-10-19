@@ -50,7 +50,7 @@ static const wchar_t* TAG = L"UIControl";
 /**
 Microsoft Extension
 */
--(instancetype)initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
+- (instancetype)initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
     if (self = [super initWithFrame:frame xamlElement:xamlElement]) {
         [self _initUIControl];
     }
@@ -66,16 +66,16 @@ Microsoft Extension
     if (self = [super initWithCoder:coder]) {
         [self _initUIControl];
 
-        BOOL selected = [coder decodeInt32ForKey : @"UISelected"];
+        BOOL selected = [coder decodeInt32ForKey:@"UISelected"];
         if (selected) {
             _curState |= UIControlStateSelected;
         }
 
-        if ([coder containsValueForKey : @"UIContentHorizontalAlignment"]) {
-            _contentHorizontalAlignment = [coder decodeInt32ForKey : @"UIContentHorizontalAlignment"];
+        if ([coder containsValueForKey:@"UIContentHorizontalAlignment"]) {
+            _contentHorizontalAlignment = [coder decodeInt32ForKey:@"UIContentHorizontalAlignment"];
         }
-        if ([coder containsValueForKey : @"UIContentVerticalAlignment"]) {
-            _contentVerticalAlignment = [coder decodeInt32ForKey : @"UIContentVerticalAlignment"];
+        if ([coder containsValueForKey:@"UIContentVerticalAlignment"]) {
+            _contentVerticalAlignment = [coder decodeInt32ForKey:@"UIContentVerticalAlignment"];
         }
     }
 

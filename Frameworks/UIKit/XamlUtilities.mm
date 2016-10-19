@@ -45,8 +45,8 @@ WUXMFontFamily* WUXFontFamilyFromUIFontName(NSString* uiFontName) {
     // side. we can remove all WRL related stuff and use projection API directly when it is ready
     ComPtr<ABI::Windows::UI::Xaml::Media::IFontFamilyFactory> fontFamilyFactory;
     ABI::Windows::Foundation::GetActivationFactory(Microsoft::WRL::Wrappers::HString::MakeReference(L"Windows.UI.Xaml.Media.FontFamily")
-        .Get(),
-        &fontFamilyFactory);
+                                                       .Get(),
+                                                   &fontFamilyFactory);
     ComPtr<ABI::Windows::UI::Xaml::Media::IFontFamily> fontFamily;
     auto fontName = Strings::NarrowToWide<HSTRING>(uiFontName);
     fontFamilyFactory->CreateInstanceWithName(fontName.Get(), nullptr, nullptr, fontFamily.GetAddressOf());

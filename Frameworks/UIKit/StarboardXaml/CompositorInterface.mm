@@ -1084,7 +1084,11 @@ public:
 
     MovementType _type;
 
-    QueuedNodeMovement(MovementType type, const std::shared_ptr<DisplayNode>& node, const std::shared_ptr<DisplayNode>& before, const std::shared_ptr<DisplayNode>& after, const std::shared_ptr<DisplayNode>& supernode) {
+    QueuedNodeMovement(MovementType type,
+                       const std::shared_ptr<DisplayNode>& node,
+                       const std::shared_ptr<DisplayNode>& before,
+                       const std::shared_ptr<DisplayNode>& after,
+                       const std::shared_ptr<DisplayNode>& supernode) {
         _type = type;
         _node = node;
         _before = before;
@@ -1171,7 +1175,7 @@ public:
         return displayNode->_xamlElement;
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
     std::shared_ptr<DisplayTransaction> CreateDisplayTransaction() override {
         return std::make_shared<DisplayTransaction>();
     }
@@ -1210,7 +1214,8 @@ public:
         transaction->QueueAnimation(std::make_shared<QueuedAnimation>(layer, animation, forKey));
     }
 
-    virtual void removeAnimation(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<DisplayAnimation>& animation) override {
+    virtual void removeAnimation(const std::shared_ptr<DisplayTransaction>& transaction,
+                                 const std::shared_ptr<DisplayAnimation>& animation) override {
         transaction->QueueAnimation(std::make_shared<QueuedAnimation>(animation));
     }
 
@@ -1272,19 +1277,19 @@ public:
     }
 
     virtual std::shared_ptr<DisplayAnimation> GetBasicDisplayAnimation(id animobj,
-                                                       NSString* propertyName,
-                                                       NSObject* fromValue,
-                                                       NSObject* toValue,
-                                                       NSObject* byValue,
-                                                       CAMediaTimingProperties* timingProperties) override {
+                                                                       NSString* propertyName,
+                                                                       NSObject* fromValue,
+                                                                       NSObject* toValue,
+                                                                       NSObject* byValue,
+                                                                       CAMediaTimingProperties* timingProperties) override {
         return std::make_shared<DisplayAnimationBasic>(animobj, propertyName, fromValue, toValue, byValue, timingProperties);
     }
 
     virtual std::shared_ptr<DisplayAnimation> GetMoveDisplayAnimation(id animobj,
-                                                      const std::shared_ptr<DisplayNode>& animNode,
-                                                      NSString* typeStr,
-                                                      NSString* subtypeStr,
-                                                      CAMediaTimingProperties* timingProperties) override {
+                                                                      const std::shared_ptr<DisplayNode>& animNode,
+                                                                      NSString* typeStr,
+                                                                      NSString* subtypeStr,
+                                                                      CAMediaTimingProperties* timingProperties) override {
         return std::make_shared<DisplayAnimationTransition>(animobj, typeStr, subtypeStr);
     }
 

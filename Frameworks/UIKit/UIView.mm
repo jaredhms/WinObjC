@@ -582,10 +582,7 @@ static std::string _printViewHeirarchy(UIView* leafView) {
 
     if ([self alpha] <= 0.01f) {
         if (DEBUG_HIT_TESTING) {
-            TraceVerbose(TAG,
-                         L"_isHitTestable returning NO for %hs(0x%p) because [self alpha] <= 0.01f.",
-                         object_getClassName(self),
-                         self);
+            TraceVerbose(TAG, L"_isHitTestable returning NO for %hs(0x%p) because [self alpha] <= 0.01f.", object_getClassName(self), self);
         }
         return NO;
     }
@@ -634,8 +631,7 @@ static std::string _printViewHeirarchy(UIView* leafView) {
     if (!xamlElement) {
         // No Xaml element was specified, so default layer init is fine
         self->layer.attach([[[[self class] layerClass] alloc] init]);
-    }
-    else {
+    } else {
         // A Xaml element was specified, so we must initialize the layer with this backing xaml element
         self->layer.attach([[[[self class] layerClass] alloc] _initWithXamlElement:xamlElement]);
     }
@@ -728,7 +724,12 @@ static std::string _printViewHeirarchy(UIView* leafView) {
 */
 - (instancetype)initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
     if (DEBUG_LAYOUT) {
-        TraceVerbose(TAG, L"[%f,%f] @ %fx%f", (float)frame.origin.x, (float)frame.origin.y, (float)frame.size.width, (float)frame.size.height);
+        TraceVerbose(TAG,
+                     L"[%f,%f] @ %fx%f",
+                     (float)frame.origin.x,
+                     (float)frame.origin.y,
+                     (float)frame.size.width,
+                     (float)frame.size.height);
     }
 
     // Run on the main thread because the underlying XAML objects can only be
@@ -1561,12 +1562,7 @@ static float doRound(float f) {
     }
 
     if (DEBUG_LAYOUT) {
-        TraceVerbose(TAG,
-                     L"Adding subview %hs(0x%p) to %hs(0x%p)",
-                     object_getClassName(subview),
-                     subview,
-                     object_getClassName(self),
-                     self);
+        TraceVerbose(TAG, L"Adding subview %hs(0x%p) to %hs(0x%p)", object_getClassName(subview), subview, object_getClassName(self), self);
     }
 
     UIWindow* subviewWindow = [subview _getWindowInternal];
@@ -2275,11 +2271,7 @@ static float doRound(float f) {
     priv->userInteractionEnabled = enabled;
 
     if (DEBUG_HIT_TESTING) {
-        TraceVerbose(TAG,
-                     L"Setting %hs(0x%p) to userInteractionEnabled=%hs.",
-                     object_getClassName(self),
-                     self,
-                     enabled ? "true" : "false");
+        TraceVerbose(TAG, L"Setting %hs(0x%p) to userInteractionEnabled=%hs.", object_getClassName(self), self, enabled ? "true" : "false");
     }
 
     // Keep our hit test state up to date

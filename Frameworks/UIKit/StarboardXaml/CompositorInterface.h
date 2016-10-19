@@ -108,7 +108,7 @@ public:
 
 typedef RefCounted<DisplayTexture> DisplayTextureRef;
 
-class DisplayAnimation : public std::enable_shared_from_this<DisplayAnimation>{
+class DisplayAnimation : public std::enable_shared_from_this<DisplayAnimation> {
 public:
     winobjc::Id _xamlAnimation;
     enum Easing { EaseInEaseOut, EaseIn, EaseOut, Linear, Default };
@@ -123,7 +123,7 @@ public:
     Easing easingFunction;
 
     DisplayAnimation();
-    virtual ~DisplayAnimation() {};
+    virtual ~DisplayAnimation(){};
 
     virtual void Completed() = 0;
     // TODO: CAN WE DO const DisplayNode&????
@@ -135,17 +135,9 @@ public:
 
     // TODO: CAN WE DO const DisplayNode&????
     concurrency::task<void> AddAnimation(
-        DisplayNode& node, 
-        const wchar_t* propertyName, 
-        bool fromValid, 
-        float from, 
-        bool toValid, 
-        float to);
+        DisplayNode& node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to);
     // TODO: CAN WE DO const DisplayNode&????
-    concurrency::task<void> AddTransitionAnimation(
-        DisplayNode& node, 
-        const char* type, 
-        const char* subtype);
+    concurrency::task<void> AddTransitionAnimation(DisplayNode& node, const char* type, const char* subtype);
 };
 
 class DisplayTexture : public RefCountedType {
@@ -160,7 +152,7 @@ protected:
 class CAXamlCompositor;
 
 // A DisplayNode is CALayer's proxy to its backing Xaml FrameworkElement.  DisplayNodes
-// are used to update the Xaml FrameworkElement's visual state (positioning, animations, etc.) based upon CALayer API calls, 
+// are used to update the Xaml FrameworkElement's visual state (positioning, animations, etc.) based upon CALayer API calls,
 // and it's also responsible for the CALayer's sublayer management (*if* that backing Xaml FrameworkElement supports sublayers).
 // When constructed, the DisplayNode inspects the passed-in Xaml FrameworkElement, and lights up all CALayer functionality that's
 // supported by the given FrameworkElement.
@@ -199,7 +191,9 @@ public:
 
     // Sublayer management
     void AddToRoot();
-    void AddSubnode(const std::shared_ptr<DisplayNode>& subNode, const std::shared_ptr<DisplayNode>& before, const std::shared_ptr<DisplayNode>& after);
+    void AddSubnode(const std::shared_ptr<DisplayNode>& subNode,
+                    const std::shared_ptr<DisplayNode>& before,
+                    const std::shared_ptr<DisplayNode>& after);
     void MoveNode(const std::shared_ptr<DisplayNode>& before, const std::shared_ptr<DisplayNode>& after);
     void RemoveFromSupernode();
 
@@ -216,13 +210,15 @@ protected:
 
 struct ICompositorTransaction {
 public:
-    virtual ~ICompositorTransaction() {}
+    virtual ~ICompositorTransaction() {
+    }
     virtual void Process() = 0;
 };
 
 struct ICompositorAnimationTransaction {
 public:
-    virtual ~ICompositorAnimationTransaction() {}
+    virtual ~ICompositorAnimationTransaction() {
+    }
     virtual concurrency::task<void> Process() = 0;
 };
 

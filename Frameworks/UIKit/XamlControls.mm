@@ -107,14 +107,12 @@ WXCTextBlock* GetLabelTextBlock(WXCGrid* labelGrid) {
 ////////////////////////////////////////////////////////////////////////////////////
 // CoreAnimation Layer Support
 ////////////////////////////////////////////////////////////////////////////////////
-void SetFrameworkElementLayerProperties(
-    WXFrameworkElement* targetElement,
-    WXCImage* layerContentProperty,
-    WXCCanvas* sublayerCanvasProperty) {
-    XamlSetFrameworkElementLayerProperties(
-        [targetElement comObj],
-        layerContentProperty ? [layerContentProperty comObj] : nullptr,
-        sublayerCanvasProperty ? [sublayerCanvasProperty comObj] : nullptr);
+void SetFrameworkElementLayerProperties(WXFrameworkElement* targetElement,
+                                        WXCImage* layerContentProperty,
+                                        WXCCanvas* sublayerCanvasProperty) {
+    XamlSetFrameworkElementLayerProperties([targetElement comObj],
+                                           layerContentProperty ? [layerContentProperty comObj] : nullptr,
+                                           sublayerCanvasProperty ? [sublayerCanvasProperty comObj] : nullptr);
 }
 
 } // namespace XamlControls

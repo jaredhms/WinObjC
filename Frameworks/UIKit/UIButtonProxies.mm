@@ -49,7 +49,7 @@
 
 static const wchar_t* tag = L"UIButtonProxies";
 
-@implementation _MockObjectBase 
+@implementation _MockObjectBase
 
 + (Class)_mockClass {
     return [NSObject class];
@@ -58,7 +58,9 @@ static const wchar_t* tag = L"UIButtonProxies";
 - (void)forwardInvocation:(NSInvocation*)invocation {
     TraceWarning(tag,
                  L"Warning: unsupported API or property is invoked on this class - %hs is currently a mock %hs and only supports a subset "
-                 L"of its selectors", class_getName([self class]), class_getName([[self class] _mockClass]));
+                 L"of its selectors",
+                 class_getName([self class]),
+                 class_getName([[self class] _mockClass]));
 }
 
 - (NSMethodSignature*)methodSignatureForSelector:(SEL)aSelector {
@@ -70,7 +72,7 @@ static const wchar_t* tag = L"UIButtonProxies";
 
 @end
 
-@implementation _UIView_Proxy 
+@implementation _UIView_Proxy
 
 + (Class)_mockClass {
     return [UIView class];
@@ -97,7 +99,7 @@ static const wchar_t* tag = L"UIButtonProxies";
 }
 
 - (CGRect)frame {
-    CGRect ret = {0};
+    CGRect ret = { 0 };
 
     // We're assuming everything will be held in a Canvas
     [WXCCanvas getTop:_xamlElement];
@@ -124,7 +126,7 @@ static const wchar_t* tag = L"UIButtonProxies";
 }
 
 - (void)setFrame:(CGRect)frame {
-    // UILabels are vertically aligned 
+    // UILabels are vertically aligned
     [super setFrame:frame];
     [_xamlTextBlock measure:[WXSizeHelper fromDimensions:frame.size.width height:frame.size.height]];
 
@@ -290,7 +292,7 @@ static const wchar_t* tag = L"UIButtonProxies";
 
 - (void)_updateDummyTextBlock {
     // When a TextBlock is in the scene graph, it may have implicit constraints on it keeping it from being
-    // correctly Measured. To ensure an unbounded Measure we replicate the TextBlock, but never add it to 
+    // correctly Measured. To ensure an unbounded Measure we replicate the TextBlock, but never add it to
     // the graph; it's used solely for measurement.
     _dummyTextBlock.textWrapping = _xamlTextBlock.textWrapping;
     _dummyTextBlock.textTrimming = _xamlTextBlock.textTrimming;
@@ -301,7 +303,6 @@ static const wchar_t* tag = L"UIButtonProxies";
     _dummyTextBlock.fontSize = _xamlTextBlock.fontSize;
     _dummyTextBlock.textAlignment = _xamlTextBlock.textAlignment;
     _dummyTextBlock.text = _xamlTextBlock.text;
-
 }
 
 @end

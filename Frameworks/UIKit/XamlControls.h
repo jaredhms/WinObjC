@@ -93,13 +93,12 @@ public:
 ////////////////////////////////////////////////////////////////////////////////////
 WXCButton* CreateButton();
 
-void HookButtonPointerEvents(
-    WXCButton* button,
-    WUXIPointerEventHandler pointerPressedHook,
-    WUXIPointerEventHandler pointerMovedHook,
-    WUXIPointerEventHandler pointerReleasedHook,
-    WUXIPointerEventHandler pointerCanceledHook,
-    WUXIPointerEventHandler pointerCaptureLostHook);
+void HookButtonPointerEvents(WXCButton* button,
+                             WUXIPointerEventHandler pointerPressedHook,
+                             WUXIPointerEventHandler pointerMovedHook,
+                             WUXIPointerEventHandler pointerReleasedHook,
+                             WUXIPointerEventHandler pointerCanceledHook,
+                             WUXIPointerEventHandler pointerCaptureLostHook);
 
 void HookLayoutEvent(WXCButton* button, WUXIPointerEventHandler autoLayoutHook);
 
@@ -126,8 +125,7 @@ WXCTextBlock* GetLabelTextBlock(WXCGrid* labelGrid);
 ////////////////////////////////////////////////////////////////////////////////////
 
 // Set one or more layer properties for the specified target xaml element
-void SetFrameworkElementLayerProperties(
-    WXFrameworkElement* targetElement,
-    WXCImage* layerContentProperty,
-    WXCCanvas* sublayerCanvasProperty);
+void SetFrameworkElementLayerProperties(WXFrameworkElement* targetElement,
+                                        WXCImage* layerContentProperty,
+                                        WXCCanvas* sublayerCanvasProperty);
 } // namespace XamlControls

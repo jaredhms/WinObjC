@@ -94,22 +94,19 @@
 }
 
 - (void)adjustTextLayerSize {
-
     [_textBlock setText:_text];
     [_textBlock setFontSize:[_font pointSize]];
 
     int mask = [_font fontDescriptor].symbolicTraits;
     if ((mask & UIFontDescriptorTraitBold) > 0) {
         [_textBlock setFontWeight:[WUTFontWeights bold]];
-    }
-    else {
+    } else {
         [_textBlock setFontWeight:[WUTFontWeights normal]];
     }
 
     if ((mask & UIFontDescriptorTraitItalic) > 0) {
         [_textBlock setFontStyle:WUTFontStyleItalic];
-    }
-    else {
+    } else {
         [_textBlock setFontStyle:WUTFontStyleNormal];
     }
 
@@ -219,7 +216,7 @@
     return self;
 }
 
--(void)_initUILabel {
+- (void)_initUILabel {
     ////////////////////////////////////////////////////////////////////
     // TODO: Ultimately this will be a UIKit.Label projected to us and
     // it will expose its backing TextBlock.  For now, we'll have to

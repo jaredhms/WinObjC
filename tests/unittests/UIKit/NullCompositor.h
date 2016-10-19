@@ -51,7 +51,8 @@ public:
     void addAnimation(const std::shared_ptr<DisplayTransaction>& transaction, id layer, id animation, id forKey) override {
     }
 
-    void removeAnimation(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<DisplayAnimation>& animation) override {
+    void removeAnimation(const std::shared_ptr<DisplayTransaction>& transaction,
+                         const std::shared_ptr<DisplayAnimation>& animation) override {
     }
 
     void setDisplayProperty(const std::shared_ptr<DisplayTransaction>& transaction,
@@ -83,20 +84,19 @@ public:
     }
 
     std::shared_ptr<DisplayAnimation> GetBasicDisplayAnimation(id caanim,
-                                               NSString* propertyName,
-                                               NSObject* fromValue,
-                                               NSObject* toValue,
-                                               NSObject* byValue,
-                                               CAMediaTimingProperties* timingProperties) override {
+                                                               NSString* propertyName,
+                                                               NSObject* fromValue,
+                                                               NSObject* toValue,
+                                                               NSObject* byValue,
+                                                               CAMediaTimingProperties* timingProperties) override {
         return nullptr;
     }
 
-    std::shared_ptr<DisplayAnimation> GetMoveDisplayAnimation(
-                                              id caanim,
-                                              const std::shared_ptr<DisplayNode>& animNode,
-                                              NSString* type,
-                                              NSString* subtype,
-                                              CAMediaTimingProperties* timingProperties) override {
+    std::shared_ptr<DisplayAnimation> GetMoveDisplayAnimation(id caanim,
+                                                              const std::shared_ptr<DisplayNode>& animNode,
+                                                              NSString* type,
+                                                              NSString* subtype,
+                                                              CAMediaTimingProperties* timingProperties) override {
         return nullptr;
     }
 

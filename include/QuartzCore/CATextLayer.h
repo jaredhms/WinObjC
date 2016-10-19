@@ -31,7 +31,7 @@ CA_EXPORT NSString* const kCAAlignmentJustified;
 CA_EXPORT_CLASS
 @interface CATextLayer : CALayer <CAMediaTiming, NSCoding>
 
-@property (copy) id string; STUB_PROPERTY;
+@property (copy) id string STUB_PROPERTY;
 @property CFTypeRef font STUB_PROPERTY;
 @property CGFloat fontSize STUB_PROPERTY;
 @property CGColorRef foregroundColor STUB_PROPERTY;

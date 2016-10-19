@@ -147,10 +147,9 @@ const float UIScrollViewDecelerationRateFast = StubConstant();
 
     // Set up the CALayer properties for our backing Xaml element so
     // our subviews are placed within our _contentCanvas
-    XamlControls::SetFrameworkElementLayerProperties(
-        _scrollViewer,
-        nullptr, // content element
-        _contentCanvas); // sublayer canvas
+    XamlControls::SetFrameworkElementLayerProperties(_scrollViewer,
+                                                     nullptr, // content element
+                                                     _contentCanvas); // sublayer canvas
 
     // creating and build 3 X 3 content grid
     _contentGrid = [WXCGrid make];

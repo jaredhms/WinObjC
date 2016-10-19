@@ -177,10 +177,10 @@ static void initInternal(UIWindow* self, CGRect pos) {
     return self;
 }
 
--(void)_moveToTopOfSameLevel {
+- (void)_moveToTopOfSameLevel {
     id windows = [[UIApplication sharedApplication] windows];
     int windowCount = [windows count];
-    int idxOfCurrentWindow = [windows indexOfObject : self];
+    int idxOfCurrentWindow = [windows indexOfObject:self];
 
     // Nothing needed if the current window is the last one in windows arrary
     if (idxOfCurrentWindow == windowCount - 1) {
@@ -188,13 +188,13 @@ static void initInternal(UIWindow* self, CGRect pos) {
     }
 
     // Nothing needed if the window level of next window is larger than current one
-    UIWindow* nextWindow = (UIWindow*)[windows objectAtIndex : idxOfCurrentWindow + 1];
+    UIWindow* nextWindow = (UIWindow*)[windows objectAtIndex:idxOfCurrentWindow + 1];
     if (nextWindow.windowLevel > _windowLevel) {
         return;
     }
 
     // Get the index of the window whose window level is larger than current window's and calculate the new position
-    int nextLevelIndex = [windows indexOfObjectPassingTest : ^BOOL(id obj, NSUInteger idx, BOOL* stop) {
+    int nextLevelIndex = [windows indexOfObjectPassingTest:^BOOL(id obj, NSUInteger idx, BOOL* stop) {
         if ([(UIWindow*)obj windowLevel] > _windowLevel) {
             *stop = YES;
             return YES;
@@ -205,19 +205,18 @@ static void initInternal(UIWindow* self, CGRect pos) {
     int idxOfNewPosition = 0;
     if (nextLevelIndex == NSNotFound) {
         idxOfNewPosition = windowCount - 1;
-    }
-    else {
+    } else {
         idxOfNewPosition = nextLevelIndex - 1;
     }
 
     // Move current window to the last one of windows with same window level
     [static_cast<NSMutableArray*>(windows) removeObjectAtIndex:idxOfCurrentWindow];
-    [static_cast<NSMutableArray*>(windows) insertObject:self atIndex : idxOfNewPosition];
+    [static_cast<NSMutableArray*>(windows) insertObject:self atIndex:idxOfNewPosition];
 
     // Reset the ZIndex property of the windows impacted
     for (int i = idxOfCurrentWindow; i <= idxOfNewPosition; i++) {
-        UIWindow* window = (UIWindow*)[windows objectAtIndex : i];
-        [window.layer _setZIndex : i + 1];
+        UIWindow* window = (UIWindow*)[windows objectAtIndex:i];
+        [window.layer _setZIndex:i + 1];
     }
 }
 
