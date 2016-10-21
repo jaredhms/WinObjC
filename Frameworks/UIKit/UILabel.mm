@@ -24,7 +24,7 @@
 #import "UIKit/UIAccessibility.h"
 #import "UIFontInternal.h"
 #import "CGContextInternal.h"
-#import "CACompositor.h"
+#import "StarboardXaml/DisplayProperties.h"
 #import "XamlControls.h"
 #import "XamlUtilities.h"
 
@@ -625,7 +625,7 @@
         }
 
         size = [_text sizeWithFont:_font
-                 constrainedToSize:CGSizeMake(GetCACompositor()->screenWidth(), bounds.size.height)
+                 constrainedToSize:CGSizeMake(DisplayProperties::ScreenWidth(), bounds.size.height)
                      lineBreakMode:_lineBreakMode];
         size.height -= [_font descender];
 

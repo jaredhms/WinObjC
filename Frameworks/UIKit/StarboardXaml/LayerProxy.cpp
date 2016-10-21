@@ -17,17 +17,10 @@
 // clang-format off
 
 #include "LayerProxy.h"
+#include "LayerCoordinator.h"
 
-#include <ppltasks.h>
-#include <robuffer.h>
-#include <collection.h>
 #include <assert.h>
-#include "CALayerXaml.h"
-
-#include "winobjc\winobjc.h"
-#include "ApplicationCompositor.h"
-#include "CompositorInterface.h"
-#include <StringHelpers.h>
+#include <ErrorHandling.h>
 
 using namespace Microsoft::WRL;
 using namespace UIKit::Private::CoreAnimation;

@@ -13,8 +13,9 @@
 // THE SOFTWARE.
 //
 //******************************************************************************
-
 #pragma once
+
+#import "CACompositor.h"
 
 struct CAMediaTimingProperties {
     BOOL _removedOnCompletion;
@@ -29,7 +30,7 @@ struct CAMediaTimingProperties {
 @interface CAAnimation () {
 @public
     CAMediaTimingProperties _timingProperties;
-    std::shared_ptr<DisplayAnimation> _runningAnimation;
+    std::shared_ptr<ILayerAnimation> _runningAnimation;
     id _attachedLayer;
     idretaintype(NSString) _keyName;
 }
@@ -42,7 +43,8 @@ struct CAMediaTimingProperties {
 @interface NSObject (CAAnimationInternal)
 - (BOOL)wasRemoved;
 - (BOOL)wasAborted;
-- (std::shared_ptr<DisplayAnimation>)_createAnimation:(CALayer*)layer forKey:(id)forKey;
+- (std::shared_ptr<ILayerAnimation>)_createAnimation:(CALayer*)layer forKey:(id)forKey;
 - (void)animationDidStart;
 - (id)animationHasStarted;
+- (void)animationDidStop:(BOOL)finished;
 @end

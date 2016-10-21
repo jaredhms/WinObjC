@@ -29,7 +29,7 @@
 #import "CALayerInternal.h"
 #import "UIDeviceInternal.h"
 #import "CATransactionInternal.h"
-#import "CACompositor.h"
+#import "StarboardXaml/DisplayProperties.h"
 
 static const wchar_t* TAG = L"UIWindow";
 
@@ -107,7 +107,7 @@ static void initInternal(UIWindow* self, CGRect pos) {
     [ourLayer _setRootLayer:TRUE];
 
     [CATransaction _addSublayerToTop:ourLayer];
-    GetCACompositor()->setNodeTopMost([ourLayer _layerProxy], true);
+    [ourLayer _layerProxy]->SetTopMost();
 
     [self setWindowLevel:UIWindowLevelNormal];
     [self setSizeUIWindowToFit:[[UIApplication displayMode] sizeUIWindowToFit]];
@@ -158,12 +158,12 @@ static void initInternal(UIWindow* self, CGRect pos) {
     frame = [self frame];
 
 #ifdef RUN_NATIVE_RESOLUTION
-    frame.size.width = GetCACompositor()->screenWidth();
-    frame.size.height = GetCACompositor()->screenHeight();
+    frame.size.width = DisplayProperties::ScreenWidth();
+    frame.size.height = DisplayProperties::ScreenHeight();
     [super setFrame:frame];
 #else
-    if (frame.size.height == 480.0f && GetCACompositor()->screenHeight() == 568.0f) {
-        frame.size.height = GetCACompositor()->screenHeight();
+    if (frame.size.height == 480.0f && DisplayProperties::ScreenHeight() == 568.0f) {
+        frame.size.height = DisplayProperties::ScreenHeight();
         [super setFrame:frame];
     }
 #endif

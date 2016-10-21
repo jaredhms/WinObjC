@@ -1,6 +1,6 @@
 //******************************************************************************
 //
-// Copyright (c) 2016 Microsoft Corporation. All rights reserved.
+// Copyright (c) 2015 Microsoft Corporation. All rights reserved.
 //
 // This code is licensed under the MIT License (MIT).
 //
@@ -13,13 +13,14 @@
 // THE SOFTWARE.
 //
 //******************************************************************************
-// clang-format does not seem to like C++/CX
+// clang-format does not like C++/CX
 // clang-format off
 #pragma once
 
-#include <list>
-#include <map>
-#include <queue>
+///////////////////////////////////////////////////////////////////////
+// TODO: Will be DisplayTexture.h if we move it to its own file too
+#include "CompositorInterface.h"
+///////////////////////////////////////////////////////////////////////
 
 namespace CoreAnimation {
 
@@ -38,90 +39,11 @@ public enum class ContentGravity {
     BottomRight
 };
 
-///////////////////////////////////////////////////////////////////////
-// TODO: MOVE TO DISPLAYANIMATION.CPP or .H
-public delegate void AnimationMethod(Platform::Object^ sender);
-
-[Windows::Foundation::Metadata::WebHostHidden]
-public ref class EventedStoryboard sealed {
-    ref class Animation {
-    internal:
-        Platform::String^ propertyName = nullptr;
-        Platform::Object^ toValue = nullptr;
-    };
-
-    enum class EasingFunction { EastInEaseIn, Linear };
-
-public:
-    property AnimationMethod^ Completed {
-        AnimationMethod^ get() {
-            return m_completed;
-        }
-        void set(AnimationMethod^ value) {
-            m_completed = value;
-        }
-    };
-
-    property AnimationMethod^ Started {
-        AnimationMethod^ get() {
-            return m_started;
-        }
-        void set(AnimationMethod^ value) {
-            m_started = value;
-        }
-    };
-
-    property Windows::UI::Xaml::Media::Animation::EasingFunctionBase^ AnimationEase {
-        Windows::UI::Xaml::Media::Animation::EasingFunctionBase^ get() {
-            return m_animationEase;
-        }
-        void set(Windows::UI::Xaml::Media::Animation::EasingFunctionBase^ value) {
-            m_animationEase = value;
-        }
-    };
-
-    EventedStoryboard();
-    EventedStoryboard(
-        double beginTime, double duration, bool autoReverse, float repeatCount, float repeatDuration, float speed, double timeOffset);
-    void Start();
-    void Abort();
-    void Animate(Windows::UI::Xaml::FrameworkElement^ layer, Platform::String^ propertyName, Platform::Object^ from, Platform::Object^ to);
-    Platform::Object^ GetStoryboard();
-
-internal:
-    AnimationMethod^ m_completed;
-    AnimationMethod^ m_started;
-
-    concurrency::task<UIKit::Private::CoreAnimation::Layer^> SnapshotLayer(UIKit::Private::CoreAnimation::Layer^ layer);
-    void AddTransition(
-        UIKit::Private::CoreAnimation::Layer^ realLayer,
-        UIKit::Private::CoreAnimation::Layer^ snapshotLayer,
-        Platform::String^ type, 
-        Platform::String^ subtype);
-
-private:
-    void _CreateFlip(UIKit::Private::CoreAnimation::Layer^ layer, bool flipRight, bool invert, bool removeFromParent);
-    void _CreateWoosh(UIKit::Private::CoreAnimation::Layer^ layer, bool fromRight, bool invert, bool removeFromParent);
-
-    Windows::UI::Xaml::Media::Animation::Storyboard^ m_container = ref new Windows::UI::Xaml::Media::Animation::Storyboard();
-    Windows::UI::Xaml::Media::Animation::EasingFunctionBase^ m_animationEase;
-};
-///////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////
-// TODO: MOVE TO SEPARATE DISPLAYPROPERTIES FILE
-// CoreAnimation Support - DisplayProperties
-class DisplayProperties {
-public:
-static double s_screenScale;
-};
-////////////////////////////////////////////////
-
 /////////////////////////////////////////////
 // Layer property management
 [Windows::Foundation::Metadata::WebHostHidden]
 public ref class LayerProperties : public Windows::UI::Xaml::DependencyObject {
-public:
+internal:
     // Initialize a FrameworkElement for CALayer support
     static void InitializeFrameworkElement(Windows::UI::Xaml::FrameworkElement^ element);
 
@@ -263,6 +185,6 @@ private:
     static void _sizeChangedCallback(Windows::UI::Xaml::DependencyObject^ sender, Windows::UI::Xaml::DependencyPropertyChangedEventArgs^ args);
 };
 
-}
+} /* namespace CoreAnimation */
 
 // clang-format on

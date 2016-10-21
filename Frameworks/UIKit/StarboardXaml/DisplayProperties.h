@@ -1,6 +1,6 @@
 //******************************************************************************
 //
-// Copyright (c) 2016 Microsoft Corporation. All rights reserved.
+// Copyright (c) 2015 Microsoft Corporation. All rights reserved.
 //
 // This code is licensed under the MIT License (MIT).
 //
@@ -13,22 +13,29 @@
 // THE SOFTWARE.
 //
 //******************************************************************************
+#pragma once
 
-#import "Starboard.h"
-#import <UIKit/UIScreenMode.h>
-#import "StarboardXaml/DisplayProperties.h"
+namespace DisplayProperties {
 
-@implementation UIScreenMode
+bool IsTablet();
+void SetTablet(bool isTablet);
 
-/**
- @Status Interoperable
-*/
-- (CGSize)size {
-    CGSize ret;
-    ret.width = DisplayProperties::ScreenWidth() * DisplayProperties::ScreenScale();
-    ret.height = DisplayProperties::ScreenHeight() * DisplayProperties::ScreenScale();
+float ScreenWidth();
+float ScreenHeight();
+void SetScreenSize(float width, float height, float scale, float rotationClockwise);
 
-    return ret;
+// Returns a calculated scale/magnification value based upon various app settings
+float ScreenScale();
+
+// Returns the raw scale/magnification factor that was set via a call to 'SetScreenSize'
+float RawScreenScale();
+
+float ScreenXDpi();
+float ScreenYDpi();
+void SetScreenDpi(int xDpi, int yDpi);
+
+int DeviceWidth();
+int DeviceHeight();
+void SetDeviceSize(int width, int height);
+
 }
-
-@end

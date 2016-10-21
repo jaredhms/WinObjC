@@ -19,49 +19,38 @@
 
 class NullCompositor : public CACompositorInterface {
 public:
-    virtual bool IsRunningAsFramework() override {
+    bool IsRunningAsFramework() override {
         return false;
     }
+    float GetScreenScale() override {
+        return 1.0f;
+    }
 
-    std::shared_ptr<DisplayTransaction> CreateDisplayTransaction() override {
+    std::shared_ptr<ILayerTransaction> CreateLayerTransaction() override {
         return nullptr;
     }
-    void QueueDisplayTransaction(const std::shared_ptr<DisplayTransaction>& transaction,
-        const std::shared_ptr<DisplayTransaction>& onTransaction) override {
+    void QueueLayerTransaction(const std::shared_ptr<ILayerTransaction>& transaction,
+        const std::shared_ptr<ILayerTransaction>& onTransaction) override {
     }
-    void ProcessTransactions() override {
+    void ProcessLayerTransactions() override {
     }
 
     std::shared_ptr<ILayerProxy> CreateLayerProxy(const Microsoft::WRL::ComPtr<IInspectable>& xamlElement) override {
         return nullptr;
     }
 
-    void addNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                 const std::shared_ptr<ILayerProxy>& node,
-                 const std::shared_ptr<ILayerProxy>& superNode,
-                 const std::shared_ptr<ILayerProxy>& beforeNode,
-                 const std::shared_ptr<ILayerProxy>& afterNode) override {
+    std::shared_ptr<ILayerAnimation> CreateBasicAnimation(CAAnimation* animation,
+                                                                 NSString* propertyName,
+                                                                 NSObject* fromValue,
+                                                                 NSObject* toValue,
+                                                                 NSObject* byValue,
+                                                                 CAMediaTimingProperties* timingProperties) override {
+        return nullptr;
     }
-    void moveNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                  const std::shared_ptr<ILayerProxy>& node,
-                  const std::shared_ptr<ILayerProxy>& beforeNode,
-                  const std::shared_ptr<ILayerProxy>& afterNode) override {
-    }
-    void removeNode(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<ILayerProxy>& node) override {
-    }
-
-    void setDisplayProperty(const std::shared_ptr<DisplayTransaction>& transaction,
-                            const std::shared_ptr<ILayerProxy>& node,
-                            const char* propertyName,
-                            NSObject* newValue) override {
-    }
-    void setNodeTexture(const std::shared_ptr<DisplayTransaction>& transaction,
-                        const std::shared_ptr<ILayerProxy>& node,
-                        const std::shared_ptr<DisplayTexture>& newTexture,
-                        CGSize contentsSize,
-                        float contentsScale) override {
-    }
-    void setNodeTopMost(const std::shared_ptr<ILayerProxy>& node, bool topMost) override {
+    std::shared_ptr<ILayerAnimation> CreateTransitionAnimation(CAAnimation* animation,
+                                                                      NSString* type,
+                                                                      NSString* subtype) override {
+        return nullptr;
     }
 
     std::shared_ptr<DisplayTexture> GetDisplayTextureForCGImage(CGImageRef img, bool create) override {
@@ -69,61 +58,6 @@ public:
     }
     Microsoft::WRL::ComPtr<IInspectable> GetBitmapForCGImage(CGImageRef img) override {
         return nullptr;
-    }
-
-    void addAnimation(const std::shared_ptr<DisplayTransaction>& transaction, id layer, id animation, id forKey) override {
-    }
-    void removeAnimation(const std::shared_ptr<DisplayTransaction>& transaction,
-        const std::shared_ptr<DisplayAnimation>& animation) override {
-    }
-    std::shared_ptr<DisplayAnimation> GetBasicDisplayAnimation(id caanim,
-                                                               NSString* propertyName,
-                                                               NSObject* fromValue,
-                                                               NSObject* toValue,
-                                                               NSObject* byValue,
-                                                               CAMediaTimingProperties* timingProperties) override {
-        return nullptr;
-    }
-    std::shared_ptr<DisplayAnimation> GetMoveDisplayAnimation(id caanim,
-                                                              const std::shared_ptr<ILayerProxy>& animNode,
-                                                              NSString* type,
-                                                              NSString* subtype,
-                                                              CAMediaTimingProperties* timingProperties) override {
-        return nullptr;
-    }
-
-    bool isTablet() override {
-        return false;
-    }
-    float screenWidth() override {
-        return 100.0f;
-    }
-    float screenHeight() override {
-        return 100.0f;
-    }
-    float screenScale() override {
-        return 1.0f;
-    }
-    int deviceWidth() override {
-        return 100;
-    }
-    int deviceHeight() override {
-        return 100;
-    }
-    float screenXDpi() override {
-        return 100;
-    }
-    float screenYDpi() override {
-        return 100;
-    }
-
-    void setScreenSize(float width, float height, float scale, float rotationClockwise) override {
-    }
-    void setDeviceSize(int width, int height) override {
-    }
-    void setScreenDpi(int xDpi, int yDpi) override {
-    }
-    void setTablet(bool isTablet) override {
     }
 
     std::shared_ptr<DisplayTexture> CreateWritableBitmapTexture32(int width, int height) override {

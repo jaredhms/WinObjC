@@ -23,13 +23,13 @@
 #include <robuffer.h>
 #include <collection.h>
 #include <assert.h>
-#include "CALayerXaml.h"
 
 #include "winobjc\winobjc.h"
 #include "ApplicationCompositor.h"
 #include "CompositorInterface.h"
 #include <StringHelpers.h>
 
+#include "DisplayProperties.h"
 #include "LayerProxy.h"
 
 using namespace Microsoft::WRL;
@@ -42,7 +42,7 @@ using namespace Windows::UI::Xaml::Media;
 
 Grid^ rootNode;
 Canvas^ windowCollection;
-extern float screenWidth, screenHeight;
+
 void GridSizeChanged(float newWidth, float newHeight);
 
 void OnGridSizeChanged(Platform::Object^ sender, SizeChangedEventArgs^ e) {
@@ -111,122 +111,6 @@ void EnableRenderingListener(void (*callback)()) {
 
 void DisableRenderingListener() {
     renderListener->Stop();
-}
-
-__inline CoreAnimation::EventedStoryboard^ GetStoryboard(DisplayAnimation* anim) {
-    return (CoreAnimation::EventedStoryboard^)(Platform::Object^)anim->_xamlAnimation;
-}
-
-DisplayAnimation::DisplayAnimation() {
-    easingFunction = EaseInEaseOut;
-}
-
-void DisplayAnimation::CreateXamlAnimation() {
-    auto xamlAnimation = ref new CoreAnimation::EventedStoryboard(
-        beginTime, duration, autoReverse, repeatCount, repeatDuration, speed, timeOffset);
-
-    switch (easingFunction) {
-        case Easing::EaseInEaseOut: {
-            auto easing = ref new Media::Animation::QuadraticEase();
-            easing->EasingMode = Media::Animation::EasingMode::EaseInOut;
-            xamlAnimation->AnimationEase = easing;
-        } break;
-
-        case Easing::EaseIn: {
-            auto easing = ref new Media::Animation::QuadraticEase();
-            easing->EasingMode = Media::Animation::EasingMode::EaseIn;
-            xamlAnimation->AnimationEase = easing;
-        } break;
-
-        case Easing::EaseOut: {
-            auto easing = ref new Media::Animation::QuadraticEase();
-            easing->EasingMode = Media::Animation::EasingMode::EaseOut;
-            xamlAnimation->AnimationEase = easing;
-        } break;
-
-        case Easing::Default: {
-            auto easing = ref new Media::Animation::QuadraticEase();
-            easing->EasingMode = Media::Animation::EasingMode::EaseInOut;
-            xamlAnimation->AnimationEase = easing;
-        } break;
-
-        case Easing::Linear: {
-            xamlAnimation->AnimationEase = nullptr;
-        } break;
-    }
-
-    _xamlAnimation = (Platform::Object^)xamlAnimation;
-}
-
-void DisplayAnimation::Start() {
-    auto xamlAnimation = (CoreAnimation::EventedStoryboard^)(Platform::Object^)_xamlAnimation;
-
-    std::weak_ptr<DisplayAnimation> weakThis = shared_from_this();
-    xamlAnimation->Completed = ref new CoreAnimation::AnimationMethod([weakThis](Platform::Object^ sender) {
-        std::shared_ptr<DisplayAnimation> strongThis = weakThis.lock();
-        if (strongThis) {
-            strongThis->Completed();
-            auto xamlAnimation = (CoreAnimation::EventedStoryboard^)(Platform::Object^)strongThis->_xamlAnimation;
-            xamlAnimation->Completed = nullptr;
-        }
-    });
-    xamlAnimation->Start();
-}
-
-void DisplayAnimation::Stop() {
-    auto xamlAnimation = (CoreAnimation::EventedStoryboard^)(Platform::Object^)_xamlAnimation;
-    auto storyboard = (Media::Animation::Storyboard^)(Platform::Object^)xamlAnimation->GetStoryboard();
-    storyboard->Stop();
-    xamlAnimation->Completed = nullptr;
-    _xamlAnimation = nullptr;
-}
-
-__inline FrameworkElement^ _GetXamlElement(ILayerProxy& node) {
-    return dynamic_cast<FrameworkElement^>(reinterpret_cast<Platform::Object^>(reinterpret_cast<LayerProxy*>(&node)->GetXamlElement().Get()));
-};
-
-concurrency::task<void> DisplayAnimation::AddAnimation(ILayerProxy& node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to) {
-    auto xamlNode = _GetXamlElement(node);
-    auto xamlAnimation = GetStoryboard(this);
-
-    xamlAnimation->Animate(xamlNode,
-                           ref new Platform::String(propertyName),
-                           fromValid ? (Platform::Object^)(double)from : nullptr,
-                           toValid ? (Platform::Object^)(double)to : nullptr);
-
-    return concurrency::task_from_result();
-}
-
-concurrency::task<void> DisplayAnimation::AddTransitionAnimation(ILayerProxy& node, const char* type, const char* subtype) {
-    auto xamlNode = _GetXamlElement(node);
-    auto xamlAnimation = GetStoryboard(this);
-
-    std::string stype(type);
-    std::wstring wtype(stype.begin(), stype.end());
-    std::string ssubtype(subtype);
-    std::wstring wsubtype(ssubtype.begin(), ssubtype.end());
-
-    // We currently only support layer snapshots/transitions on our default Layer implementation
-    auto coreAnimationLayer = dynamic_cast<Layer^>(xamlNode);
-    if (!coreAnimationLayer) {
-        UNIMPLEMENTED_WITH_MSG(
-            "Layer transition animations not supported on this Xaml element: [%ws].",
-            xamlNode->GetType()->FullName->Data());
-        return concurrency::task_from_result();
-    }
-
-    // Render a layer snapshot, then kick off the animation
-    return xamlAnimation->SnapshotLayer(coreAnimationLayer)
-        .then([this, xamlAnimation, coreAnimationLayer, wtype, wsubtype](Layer^ snapshotLayer) noexcept {
-
-        xamlAnimation->AddTransition(
-            coreAnimationLayer,
-            snapshotLayer,
-            ref new Platform::String(wtype.data()),
-            ref new Platform::String(wsubtype.data()));
-
-        Start();
-    } , concurrency::task_continuation_context::use_current());
 }
 
 ComPtr<IInspectable> CreateBitmapFromImageData(const void* ptr, int len) {
@@ -316,7 +200,6 @@ void SetScreenParameters(float width, float height, float magnification, float r
     }
 
     windowCollection->RenderTransform = globalTransform;
-    CoreAnimation::DisplayProperties::s_screenScale = static_cast<double>(magnification);
 }
 
 extern "C" void SetXamlRoot(Windows::UI::Xaml::Controls::Grid^ grid, ActivationType activationType) {

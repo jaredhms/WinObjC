@@ -192,7 +192,7 @@ static void DoDisplayList(CALayer* layer) {
         std::shared_ptr<DisplayTexture> newTexture = [cur->self _getDisplayTexture];
         cur->needsDisplay = FALSE;
         if (newTexture) {
-            GetCACompositor()->setNodeTexture([CATransaction _currentDisplayTransaction],
+            [CATransaction _currentLayerTransaction]->SetLayerTexture(
                                               cur->_layerProxy,
                                               newTexture,
                                               cur->contentsSize,
@@ -1229,7 +1229,7 @@ static void doRecursiveAction(CALayer* layer, NSString* actionName) {
     if ([delegateAddr respondsToSelector:@selector(drawRect:)]) {
         if (!object_isMethodFromClass(priv->delegate, @selector(drawRect:), "UIView") &&
             ![priv->delegate isKindOfClass:[CAEAGLLayer class]]) {
-            priv->contentsScale = GetCACompositor()->screenScale();
+            priv->contentsScale = GetCACompositor()->GetScreenScale();
         }
     }
 }
@@ -1304,7 +1304,8 @@ static void doRecursiveAction(CALayer* layer, NSString* actionName) {
         }
     }
 
-    GetCACompositor()->setNodeTexture([CATransaction _currentDisplayTransaction], priv->_layerProxy, NULL, CGSizeMake(0, 0), 0.0f);
+    // Clear out the display texture for this layer
+    [CATransaction _currentLayerTransaction]->SetLayerTexture(priv->_layerProxy, nullptr, CGSizeMake(0, 0), 0.0f);
     [self setNeedsDisplay];
 }
 
@@ -2257,8 +2258,7 @@ static void doRecursiveAction(CALayer* layer, NSString* actionName) {
                            }
 
                            // Always commit and process all queued CATransactions
-                           [CATransaction _commitRootQueue];
-                           GetCACompositor()->ProcessTransactions();
+                           [CATransaction _commitAndProcessRootQueue];
                        });
     }
 }

@@ -1,6 +1,6 @@
 //******************************************************************************
 //
-// Copyright (c) 2016 Microsoft Corporation. All rights reserved.
+// Copyright (c) 2015 Microsoft Corporation. All rights reserved.
 //
 // This code is licensed under the MIT License (MIT).
 //
@@ -16,36 +16,22 @@
 // clang-format does not like C++/CX
 // clang-format off
 
-#include "ppltasks.h"
-#include "LoggingNative.h"
-#include "CALayerXaml.h"
-#include <StringHelpers.h>
-#include <LoggingNative.h>
-#include <algorithm>
-#include <collection.h>
+#include "LayerCoordinator.h"
+#include "LayerProxy.h"
 
-using namespace concurrency;
+#include <ErrorHandling.h>
+
 using namespace Platform;
-using namespace Strings::Private;
 using namespace UIKit::Private::CoreAnimation;
-using namespace Windows::System::Threading;
 using namespace Windows::Foundation;
-using namespace Windows::UI;
-using namespace Windows::UI::Composition;
-using namespace Windows::UI::Core;
-using namespace Windows::UI::Input;
+using namespace Windows::Storage::Streams;
 using namespace Windows::UI::Xaml;
-using namespace Windows::UI::Xaml::Automation::Peers;
 using namespace Windows::UI::Xaml::Controls;
-using namespace Windows::UI::Xaml::Hosting;
-using namespace Windows::UI::Xaml::Input;
 using namespace Windows::UI::Xaml::Media;
 using namespace Windows::UI::Xaml::Media::Animation;
 using namespace Windows::UI::Xaml::Media::Imaging;
-using namespace Windows::UI::Xaml::Shapes;
-using namespace Windows::Graphics::Display;
 
-static const wchar_t* TAG = L"!!!!TODO SPLIT OUT AND GIVE PROPER NAMES!!!!";
+static const wchar_t* TAG = L"LayerCoordinator";
 
 static const bool DEBUG_ALL = true;
 static const bool DEBUG_POSITION = DEBUG_ALL || false;
@@ -54,324 +40,6 @@ static const bool DEBUG_SIZE = DEBUG_ALL || false;
 
 namespace CoreAnimation {
 
-////////////////////////////////////////////////////////////////////////////
-// TODO: MOVE TO DISPLAYANIMATION.CPP
-// EventedStoryboard
-static const double c_hundredNanoSeconds = 10000000.0;
-
-EventedStoryboard::EventedStoryboard() {
-    // AppxManifest.xml appears to fail to enumerate runtimeclasses with accessors and no default constructor in the Win8.1 SDK.
-    throw ref new Platform::FailureException("Do not use the default constructor; this is merely here as a bug fix.");
-}
-
-EventedStoryboard::EventedStoryboard(
-    double beginTime, double duration, bool autoReverse, float repeatCount, float repeatDuration, float speed, double timeOffset) {
-    TimeSpan beginTimeSpan = TimeSpan();
-    beginTimeSpan.Duration = (long long)(beginTime * c_hundredNanoSeconds);
-    m_container->BeginTime = beginTimeSpan;
-    TimeSpan timeSpan = TimeSpan();
-    timeSpan.Duration = (long long)(duration * c_hundredNanoSeconds);
-    m_container->Duration = Duration(timeSpan);
-    if (repeatCount != 0) {
-        m_container->RepeatBehavior = RepeatBehavior(repeatCount);
-    }
-    if (repeatDuration != 0) {
-        TimeSpan timeSpan = TimeSpan();
-        timeSpan.Duration = (long long)(repeatDuration * c_hundredNanoSeconds);
-        m_container->RepeatBehavior = RepeatBehavior(timeSpan);
-    }
-    m_container->SpeedRatio = speed;
-    m_container->AutoReverse = autoReverse;
-    m_container->FillBehavior = FillBehavior::HoldEnd;
-    m_container->Completed += ref new EventHandler<Object^>([this](Object^ sender, Object^ args) {
-        if (Completed != nullptr) {
-            Completed(this);
-        }
-        m_container->Stop();
-    });
-    TimeSpan span = m_container->BeginTime->Value;
-    ThreadPoolTimer^ beginTimer =
-        ThreadPoolTimer::CreateTimer(ref new TimerElapsedHandler([this](ThreadPoolTimer^ timer) {
-                                         IAsyncAction^ ret = m_container->Dispatcher->RunAsync(CoreDispatcherPriority::High,
-                                                                                               ref new DispatchedHandler([this]() {
-                                                                                                   if (Started != nullptr) {
-                                                                                                       Started(this);
-                                                                                                   }
-                                                                                               }));
-                                     }),
-                                     m_container->BeginTime->Value);
-}
-
-void EventedStoryboard::Start() {
-    m_container->Begin();
-}
-
-void EventedStoryboard::Abort() {
-    UNIMPLEMENTED();
-}
-
-void EventedStoryboard::_CreateFlip(Layer^ layer, bool flipRight, bool invert, bool removeFromParent) {
-    if (layer->Projection == nullptr) {
-        layer->Projection = ref new PlaneProjection();
-    }
-
-    DoubleAnimation^ rotateAnim = ref new DoubleAnimation();
-    rotateAnim->Duration = m_container->Duration;
-
-    if (!invert) {
-        rotateAnim->From = 0.01;
-        if (!flipRight) {
-            rotateAnim->To = (double)180;
-        } else {
-            rotateAnim->To = (double)-180;
-        }
-    } else {
-        if (!flipRight) {
-            rotateAnim->From = (double)180;
-            rotateAnim->To = (double)360;
-        } else {
-            rotateAnim->From = (double)-180;
-            rotateAnim->To = (double)-360;
-        }
-    }
-
-    ((PlaneProjection^)layer->Projection)->CenterOfRotationX = CoreAnimation::LayerProperties::GetVisualWidth(layer) / 2;
-    ((PlaneProjection^)layer->Projection)->CenterOfRotationY = CoreAnimation::LayerProperties::GetVisualHeight(layer) / 2;
-    Storyboard::SetTargetProperty(rotateAnim, "(UIElement.Projection).(PlaneProjection.RotationY)");
-    Storyboard::SetTarget(rotateAnim, layer);
-    m_container->Children->Append(rotateAnim);
-
-    DoubleAnimation^ moveAnim = ref new DoubleAnimation();
-    moveAnim->Duration = m_container->Duration;
-    moveAnim->From = 0.01;
-    moveAnim->To = (double)-160;
-    moveAnim->SpeedRatio = 2.0;
-    moveAnim->AutoReverse = true;
-
-    Storyboard::SetTarget(moveAnim, layer);
-    Storyboard::SetTargetProperty(moveAnim, "(UIElement.Projection).(PlaneProjection.GlobalOffsetZ)");
-    m_container->Children->Append(moveAnim);
-
-    DoubleAnimation^ fade1 = ref new DoubleAnimation();
-    Storyboard::SetTarget(fade1, layer);
-    Storyboard::SetTargetProperty(fade1, "(UIElement.Opacity)");
-
-    if (!invert) {
-        TimeSpan fade1TimeSpan = TimeSpan();
-        fade1TimeSpan.Duration = m_container->Duration.TimeSpan.Duration / 2;
-        fade1->Duration = Duration(fade1TimeSpan);
-        fade1->From = 1.0;
-        fade1->To = 0.5;
-        fade1->FillBehavior = FillBehavior::HoldEnd;
-    } else {
-        TimeSpan fade1TimeSpan = TimeSpan();
-        fade1TimeSpan.Duration = m_container->Duration.TimeSpan.Duration / 2;
-        fade1->Duration = Duration(fade1TimeSpan);
-        TimeSpan fade1BeginTimeSpan = TimeSpan();
-        fade1BeginTimeSpan.Duration = m_container->Duration.TimeSpan.Duration / 2;
-        fade1->BeginTime = fade1BeginTimeSpan;
-        fade1->From = 0.5;
-        fade1->To = 1.0;
-        fade1->FillBehavior = FillBehavior::HoldEnd;
-
-        fade1->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) { layer->Opacity = 1.0; });
-    }
-
-    if (removeFromParent) {
-        fade1->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) {
-            VisualTreeHelper::DisconnectChildrenRecursive(layer);
-        });
-    } else {
-        rotateAnim->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) {
-            // Using Projection transforms (even Identity) causes less-than-pixel-perfect rendering.
-            layer->Projection = nullptr;
-        });
-    }
-
-    m_container->Children->Append(fade1);
-}
-
-void EventedStoryboard::_CreateWoosh(Layer^ layer, bool fromRight, bool invert, bool removeFromParent) {
-    if (layer->Projection == nullptr) {
-        layer->Projection = ref new PlaneProjection();
-    }
-
-    DoubleAnimation^ wooshAnim = ref new DoubleAnimation();
-    wooshAnim->Duration = m_container->Duration;
-    wooshAnim->EasingFunction = ref new PowerEase();
-    wooshAnim->EasingFunction->EasingMode = EasingMode::EaseOut;
-
-    if (!invert) {
-        if (fromRight) {
-            wooshAnim->From = (double)CoreAnimation::LayerProperties::GetVisualWidth(layer);
-            wooshAnim->To = 0.01;
-        } else {
-            wooshAnim->From = 0.01;
-            wooshAnim->To = (double)CoreAnimation::LayerProperties::GetVisualWidth(layer);
-        }
-    } else {
-        if (fromRight) {
-            wooshAnim->From = 0.01;
-            wooshAnim->To = (double)(-CoreAnimation::LayerProperties::GetVisualWidth(layer) / 4);
-        } else {
-            wooshAnim->From = (double)(-CoreAnimation::LayerProperties::GetVisualWidth(layer) / 4);
-            wooshAnim->To = 0.01;
-        }
-    }
-
-    Storyboard::SetTargetProperty(wooshAnim, "(UIElement.Projection).(PlaneProjection.LocalOffsetX)");
-    Storyboard::SetTarget(wooshAnim, layer);
-
-    if (removeFromParent) {
-        wooshAnim->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) {
-            VisualTreeHelper::DisconnectChildrenRecursive(layer);
-        });
-    } else {
-        wooshAnim->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) {
-            // Using Projection transforms (even Identity) causes less-than-pixel-perfect rendering.
-            layer->Projection = nullptr;
-        });
-    }
-
-    m_container->Children->Append(wooshAnim);
-}
-
-concurrency::task<Layer^> EventedStoryboard::SnapshotLayer(Layer^ layer) {
-    if (((layer->Height == 0) && (layer->Width == 0)) || (layer->Opacity == 0)) {
-        return concurrency::task_from_result<Layer^>(nullptr);
-    }
-    else {
-        RenderTargetBitmap^ snapshot = ref new RenderTargetBitmap();
-        return concurrency::create_task(
-                snapshot->RenderAsync(layer, static_cast<int>(CoreAnimation::LayerProperties::GetVisualWidth(layer) * DisplayProperties::s_screenScale), 0))
-            .then([snapshot, layer](concurrency::task<void> result) noexcept {
-            try {
-                result.get();
-            } catch (Platform::InvalidArgumentException^ ex) {
-                // Handle exceptions related to invalid layer attribute passed to RenderAsync
-                TraceWarning(TAG,
-                             L"RenderAsync threw InvalidArgumentException exception - [%ld]%s",
-                             ex->HResult,
-                             ex->Message);
-                return static_cast<Layer^>(nullptr);
-            }
-
-            // Return a new 'copy' layer with the rendered content
-            Layer^ newLayer = ref new Layer();
-            CoreAnimation::LayerProperties::InitializeFrameworkElement(newLayer);
-
-            // Copy display properties from the old layer to the new layer
-            CoreAnimation::LayerProperties::SetValue(newLayer, "opacity", CoreAnimation::LayerProperties::GetValue(layer, "opacity"));
-            CoreAnimation::LayerProperties::SetValue(newLayer, "position", CoreAnimation::LayerProperties::GetValue(layer, "position"));
-            CoreAnimation::LayerProperties::SetValue(newLayer, "size", CoreAnimation::LayerProperties::GetValue(layer, "size"));
-            CoreAnimation::LayerProperties::SetValue(newLayer, "anchorPoint", CoreAnimation::LayerProperties::GetValue(layer, "anchorPoint"));
-
-            int width = snapshot->PixelWidth;
-            int height = snapshot->PixelHeight;
-            DisplayInformation^ dispInfo = Windows::Graphics::Display::DisplayInformation::GetForCurrentView();
-
-            // Set the snapshot as the content of the new layer
-            CoreAnimation::LayerProperties::SetContent(
-                newLayer, 
-                snapshot,
-                static_cast<float>(width),
-                static_cast<float>(height), 
-                static_cast<float>(DisplayProperties::s_screenScale * dispInfo->RawPixelsPerViewPixel));
-
-            // There seems to be a bug in Xaml where Render'd layers get sized to their visible content... sort of.
-            // If the UIViewController being transitioned away from has transparent content, the height returned is less the
-            // navigation bar, as though Xaml sizes the buffer to the largest child Visual, and only expands where needed.
-            // Top/bottom switched due to geometric origin of CALayer so read this as UIViewContentModeTopLeft
-            CoreAnimation::LayerProperties::SetContentGravity(newLayer, CoreAnimation::ContentGravity::BottomLeft);
-
-            return newLayer;
-        }, concurrency::task_continuation_context::use_current());
-    }
-}
-
-void EventedStoryboard::AddTransition(Layer^ realLayer, Layer^ snapshotLayer, String^ type, String^ subtype) {
-    if (type == "kCATransitionFlip") {
-        TimeSpan timeSpan = TimeSpan();
-        timeSpan.Duration = (long long)(0.75 * c_hundredNanoSeconds);
-        m_container->Duration = Duration(timeSpan);
-        
-        auto wtf = VisualTreeHelper::GetParent(realLayer);
-
-        Panel^ parent = (Panel^)VisualTreeHelper::GetParent(realLayer);
-
-        bool flipToLeft = true;
-        if (subtype != "kCATransitionFromLeft") {
-            flipToLeft = false;
-        }
-
-        // We don't need to animate a snapshot if it doesn't exist
-        if (snapshotLayer) {
-            unsigned int idx;
-            parent->Children->IndexOf(realLayer, &idx);
-            parent->Children->InsertAt(idx + 1, snapshotLayer);
-            parent->InvalidateArrange();
-            realLayer->Opacity = 0;
-            _CreateFlip(snapshotLayer, flipToLeft, false, true);
-        }
-
-        _CreateFlip(realLayer, flipToLeft, true, false);
-    }
-    else {
-        TimeSpan timeSpan = TimeSpan();
-        timeSpan.Duration = (long long)(0.5 * c_hundredNanoSeconds);
-        m_container->Duration = Duration(timeSpan);
-        Panel^ parent = (Panel^)VisualTreeHelper::GetParent(realLayer);
-
-        bool fromRight = true;
-        if (subtype == "kCATransitionFromLeft") {
-            fromRight = false;
-        }
-
-        if (fromRight) {
-            // We don't need to animate a snapshot if it doesn't exist
-            if (snapshotLayer) {
-                unsigned int idx;
-                parent->Children->IndexOf(realLayer, &idx);
-                parent->Children->InsertAt(idx, snapshotLayer);
-                parent->InvalidateArrange();
-                _CreateWoosh(snapshotLayer, fromRight, true, true);
-            }
-
-            _CreateWoosh(realLayer, fromRight, false, false);
-        }
-        else {
-            // We don't need to animate a snapshot if it doesn't exist
-            if (snapshotLayer) {
-                unsigned int idx;
-                parent->Children->IndexOf(realLayer, &idx);
-                parent->Children->InsertAt(idx + 1, snapshotLayer);
-                parent->InvalidateArrange();
-                _CreateWoosh(snapshotLayer, fromRight, false, true);
-            }
-
-            _CreateWoosh(realLayer, fromRight, true, false);
-        }
-    }
-}
-
-void EventedStoryboard::Animate(FrameworkElement^ layer, String^ propertyName, Object^ from, Object^ to) {
-    DoubleAnimation^ timeline = ref new DoubleAnimation();
-    timeline->Duration = m_container->Duration;
-    timeline->EasingFunction = m_animationEase;
-    CoreAnimation::LayerProperties::AnimateValue(layer, m_container, timeline, propertyName, from, to);
-}
-
-Object^ EventedStoryboard::GetStoryboard() {
-    return m_container;
-}
-
-/////////////////////////////////////////////
-// CoreAnimation Support - DisplayProperties
-// TODO:MOVE TO DISPLAYPROPERTIES.CPP
-double DisplayProperties::s_screenScale = 1.0;
-
-//////////////////////////////////////////////////////////////////////////////
-// TODO:MOVE TO LAYERPROPERTIES.CPP
 // Provides support for setting, animating and retrieving values.
 delegate void ApplyAnimationFunction(FrameworkElement^ target,
     Storyboard^ storyboard,
@@ -1569,6 +1237,6 @@ void LayerProperties::AddAnimation(Platform::String^ propertyName,
     Storyboard::SetTargetProperty(posxAnim, propertyName);
 }
 
-}
+} /* namespace CoreAnimation */
 
 // clang-format on

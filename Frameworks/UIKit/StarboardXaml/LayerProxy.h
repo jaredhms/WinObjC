@@ -41,6 +41,11 @@ public:
     void* GetPropertyValue(const char* propertyName) override;
     void SetShouldRasterize(bool shouldRasterize) override;
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // TODO: Can we remove this altogether and just set the z-index on the backing xaml element?
+    void SetTopMost() override;
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     // Display properties
     void SetProperty(const wchar_t* name, float value);
     void SetPropertyInt(const wchar_t* name, int value);
@@ -54,11 +59,6 @@ public:
     ///////////////////////////////////////////////////////////////////////////////////////////////
     // TODO: SHOULD REMOVE AND JUST DO ON UIWINDOW'S CANVAS
     void SetNodeZIndex(int zIndex);
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    // TODO: CAN/SHOULD WE REMOVE THIS?
-    void SetTopMost();
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     // General property management
@@ -77,6 +77,7 @@ protected:
     float _GetPresentationPropertyValue(const char* name);
 
     bool _isRoot;
+    // TODO: weak_ptr or reference??
     LayerProxy* _parent;
     std::set<std::shared_ptr<LayerProxy>> _subnodes;
     std::shared_ptr<DisplayTexture> _currentTexture;

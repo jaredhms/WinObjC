@@ -28,8 +28,11 @@
 #import <windows.foundation.h>
 #include <COMIncludes_end.h>
 
+#include "winobjc\winobjc.h"
+
 #else
 
+#include <memory>
 #include <wrl/client.h>
 
 #endif
@@ -42,16 +45,54 @@ public:
     virtual Microsoft::WRL::ComPtr<IInspectable> GetXamlElement() = 0;
     virtual void* GetPropertyValue(const char* propertyName) = 0;
     virtual void SetShouldRasterize(bool shouldRasterize) = 0;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // TODO: Can we remove this altogether and just set the z-index on the backing xaml element?
+    virtual void SetTopMost() = 0;
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+};
+
+// Proxy between CAAnimation and its Xaml representation
+struct ILayerAnimation {
+public:
+    virtual ~ILayerAnimation() {}
 };
 
 #if defined(__cplusplus) && defined(__OBJC__)
 
-#include <memory>
-#include "winobjc\winobjc.h"
-
-class DisplayAnimation;
 class DisplayTexture;
-class DisplayTransaction;
+
+// Proxy between CATransaction and its backing implementation
+struct ILayerTransaction {
+public:
+    virtual ~ILayerTransaction() {}
+
+    // Sublayer management
+    virtual void AddLayer(const std::shared_ptr<ILayerProxy>& layer,
+                         const std::shared_ptr<ILayerProxy>& superLayer,
+                         const std::shared_ptr<ILayerProxy>& beforeLayer,
+                         const std::shared_ptr<ILayerProxy>& afterLayer) = 0;
+    virtual void MoveLayer(const std::shared_ptr<ILayerProxy>& layer,
+                          const std::shared_ptr<ILayerProxy>& beforeLayer,
+                          const std::shared_ptr<ILayerProxy>& afterLayer) = 0;
+    virtual void RemoveLayer(const std::shared_ptr<ILayerProxy>& layer) = 0;
+
+    // Property management
+    virtual void SetLayerProperty(const std::shared_ptr<ILayerProxy>& layer,
+                                  const char* propertyName,
+                                  NSObject* newValue) = 0;
+
+    // Display management
+    virtual void SetLayerTexture(const std::shared_ptr<ILayerProxy>& layer,
+                                const std::shared_ptr<DisplayTexture>& newTexture,
+                                CGSize contentsSize,
+                                float contentsScale) = 0;
+
+    // Animation management
+    virtual void AddAnimation(CALayer* layer, CAAnimation* animation, NSString* forKey) = 0;
+    virtual void RemoveAnimation(const std::shared_ptr<ILayerAnimation>& animation) = 0;
+};
+
 struct CAMediaTimingProperties;
 
 #define CACompositorRotationNone 0.0f
@@ -63,39 +104,27 @@ class CACompositorInterface {
 public:
     // Compositor APIs
     virtual bool IsRunningAsFramework() = 0;
+    virtual float GetScreenScale() = 0;
 
     // CATransaction support
-    virtual std::shared_ptr<DisplayTransaction> CreateDisplayTransaction() = 0;
-    virtual void QueueDisplayTransaction(const std::shared_ptr<DisplayTransaction>& transaction,
-                                         const std::shared_ptr<DisplayTransaction>& onTransaction) = 0;
-    virtual void ProcessTransactions() = 0;
+    virtual std::shared_ptr<ILayerTransaction> CreateLayerTransaction() = 0;
+    virtual void QueueLayerTransaction(const std::shared_ptr<ILayerTransaction>& transaction,
+                                         const std::shared_ptr<ILayerTransaction>& onTransaction) = 0;
+    virtual void ProcessLayerTransactions() = 0;
 
-    // LayerProxy creation
+    // CALayer support
     virtual std::shared_ptr<ILayerProxy> CreateLayerProxy(const Microsoft::WRL::ComPtr<IInspectable>& xamlElement) = 0;
 
-    // Sublayer management
-    virtual void addNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                         const std::shared_ptr<ILayerProxy>& node,
-                         const std::shared_ptr<ILayerProxy>& superNode,
-                         const std::shared_ptr<ILayerProxy>& beforeNode,
-                         const std::shared_ptr<ILayerProxy>& afterNode) = 0;
-    virtual void moveNode(const std::shared_ptr<DisplayTransaction>& transaction,
-                          const std::shared_ptr<ILayerProxy>& node,
-                          const std::shared_ptr<ILayerProxy>& beforeNode,
-                          const std::shared_ptr<ILayerProxy>& afterNode) = 0;
-    virtual void removeNode(const std::shared_ptr<DisplayTransaction>& transaction, const std::shared_ptr<ILayerProxy>& node) = 0;
-
-    // Layer properties
-    virtual void setDisplayProperty(const std::shared_ptr<DisplayTransaction>& transaction,
-                                    const std::shared_ptr<ILayerProxy>& node,
-                                    const char* propertyName,
-                                    NSObject* newValue) = 0;
-    virtual void setNodeTexture(const std::shared_ptr<DisplayTransaction>& transaction,
-                                const std::shared_ptr<ILayerProxy>& node,
-                                const std::shared_ptr<DisplayTexture>& newTexture,
-                                CGSize contentsSize,
-                                float contentsScale) = 0;
-    virtual void setNodeTopMost(const std::shared_ptr<ILayerProxy>& node, bool topMost) = 0;
+    // CAAnimation support
+    virtual std::shared_ptr<ILayerAnimation> CreateBasicAnimation(CAAnimation* animation,
+                                                                 NSString* propertyName,
+                                                                 NSObject* fromValue,
+                                                                 NSObject* toValue,
+                                                                 NSObject* byValue,
+                                                                 CAMediaTimingProperties* timingProperties) = 0;
+    virtual std::shared_ptr<ILayerAnimation> CreateTransitionAnimation(CAAnimation* animation,
+                                                                      NSString* type,
+                                                                      NSString* subtype) = 0;
 
     // DisplayTextures
     virtual std::shared_ptr<DisplayTexture> GetDisplayTextureForCGImage(CGImageRef img, bool create) = 0;
@@ -106,38 +135,6 @@ public:
     virtual std::shared_ptr<DisplayTexture> CreateWritableBitmapTexture32(int width, int height) = 0;
     virtual void* LockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& texture, int* stride) = 0;
     virtual void UnlockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& texture) = 0;
-
-    // Animations
-    virtual void addAnimation(const std::shared_ptr<DisplayTransaction>& transaction, id layer, id animation, id forKey) = 0;
-    virtual void removeAnimation(const std::shared_ptr<DisplayTransaction>& transaction,
-                                 const std::shared_ptr<DisplayAnimation>& animation) = 0;
-    virtual std::shared_ptr<DisplayAnimation> GetBasicDisplayAnimation(id caanim,
-                                                                       NSString* propertyName,
-                                                                       NSObject* fromValue,
-                                                                       NSObject* toValue,
-                                                                       NSObject* byValue,
-                                                                       CAMediaTimingProperties* timingProperties) = 0;
-    virtual std::shared_ptr<DisplayAnimation> GetMoveDisplayAnimation(id caanim,
-                                                                      const std::shared_ptr<ILayerProxy>& animNode,
-                                                                      NSString* type,
-                                                                      NSString* subtype,
-                                                                      CAMediaTimingProperties* timingProperties) = 0;
-
-    ////////////////////////////////////////////////////////////////////////
-    // TODO: Move to some screen/device API
-    virtual bool isTablet() = 0;
-    virtual float screenWidth() = 0;
-    virtual float screenHeight() = 0;
-    virtual float screenScale() = 0;
-    virtual int deviceWidth() = 0;
-    virtual int deviceHeight() = 0;
-    virtual float screenXDpi() = 0;
-    virtual float screenYDpi() = 0;
-
-    virtual void setScreenSize(float width, float height, float scale, float rotationClockwise) = 0;
-    virtual void setDeviceSize(int width, int height) = 0;
-    virtual void setScreenDpi(int xDpi, int yDpi) = 0;
-    virtual void setTablet(bool isTablet) = 0;
     ////////////////////////////////////////////////////////////////////////
 
     ////////////////////////////////////////////////////////////////////////

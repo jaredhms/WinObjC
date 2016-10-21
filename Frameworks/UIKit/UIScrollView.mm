@@ -41,7 +41,7 @@
 
 #import "CAAnimationInternal.h"
 #import "CALayerInternal.h"
-#import "CACompositor.h"
+#import "StarboardXaml/DisplayProperties.h"
 #import "UIEventInternal.h"
 #import "UIGestureRecognizerInternal.h"
 #import "UITouchInternal.h"

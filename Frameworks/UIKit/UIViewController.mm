@@ -40,7 +40,7 @@
 #import "UIKit/UIViewController.h"
 
 #import "AutoLayout.h"
-#import "CACompositor.h"
+#import "StarboardXaml/DisplayProperties.h"
 #import "CoreGraphics/CGContext.h"
 #import "CoreGraphics/CGAffineTransform.h"
 
@@ -55,6 +55,8 @@
 
 #import "UWP/WindowsUIXaml.h"
 #import "UWP/WindowsFoundation.h"
+
+#import <ErrorHandling.h>
 
 extern BOOL g_presentingAnimated;
 
@@ -120,7 +122,7 @@ bool isSupportedControllerOrientation(UIViewController* controller, UIInterfaceO
     NSDictionary* infoDict = [[NSBundle mainBundle] infoDictionary];
     NSArray* orientations = 0;
 
-    if (GetCACompositor()->isTablet()) {
+    if (DisplayProperties::IsTablet()) {
         orientations = [infoDict objectForKey:@"UISupportedInterfaceOrientations~ipad"];
     }
     if (!orientations) {
@@ -160,7 +162,7 @@ bool isSupportedControllerOrientation(UIViewController* controller, UIInterfaceO
 UIInterfaceOrientation supportedOrientationForOrientation(UIViewController* controller, UIInterfaceOrientation orientation) {
     NSDictionary* infoDict = [[NSBundle mainBundle] infoDictionary];
     NSArray* orientations = 0;
-    if (GetCACompositor()->isTablet()) {
+    if (DisplayProperties::IsTablet()) {
         orientations = [infoDict objectForKey:@"UISupportedInterfaceOrientations~ipad"];
     }
     if (!orientations) {
@@ -449,7 +451,7 @@ NSMutableDictionary* _pageMappings;
 }
 
 - (CGRect)_modalPresentationFormSheetFrame {
-    if (!GetCACompositor()->isTablet()) {
+    if (!DisplayProperties::IsTablet()) {
         // fullscreen on non-tablets
         return [[UIScreen mainScreen] applicationFrame];
     }
@@ -471,7 +473,7 @@ NSMutableDictionary* _pageMappings;
 
 - (BOOL)_hidesParent {
     UIModalPresentationStyle style = [self modalPresentationStyle];
-    if ((style == UIModalPresentationFormSheet || style == UIModalPresentationPopover) && GetCACompositor()->isTablet()) {
+    if ((style == UIModalPresentationFormSheet || style == UIModalPresentationPopover) && DisplayProperties::IsTablet()) {
         return NO;
     }
     return YES;
@@ -885,7 +887,7 @@ NSMutableDictionary* _pageMappings;
     }
 
     if (priv->view == nil) {
-        CGRect frame = { 0.0f, 0.0f, GetCACompositor()->screenWidth(), GetCACompositor()->screenHeight() };
+        CGRect frame = { 0.0f, 0.0f, DisplayProperties::ScreenWidth(), DisplayProperties::ScreenHeight() };
 
         frame = [[UIScreen mainScreen] applicationFrame]; /** This is correct **/
         if ([self modalPresentationStyle] == UIModalPresentationFormSheet) {
@@ -903,7 +905,7 @@ NSMutableDictionary* _pageMappings;
 
 - (void)_doResizeToScreen {
     if ((priv->_resizeToScreen && priv->view && priv->_autoresize) || [self wantsFullScreenLayout]) {
-        CGRect frame = { 0.0f, 0.0f, GetCACompositor()->screenHeight(), GetCACompositor()->screenWidth() };
+        CGRect frame = { 0.0f, 0.0f, DisplayProperties::ScreenHeight(), DisplayProperties::ScreenWidth() };
 
         if ([self wantsFullScreenLayout]) {
             frame = [[UIScreen mainScreen] bounds];
@@ -930,7 +932,7 @@ NSMutableDictionary* _pageMappings;
 
         if (priv->view == nil) {
             TraceVerbose(TAG, L"Class name=%hs", object_getClassName(self));
-            CGRect frame = { 0.0f, 0.0f, GetCACompositor()->screenHeight(), GetCACompositor()->screenWidth() };
+            CGRect frame = { 0.0f, 0.0f, DisplayProperties::ScreenHeight(), DisplayProperties::ScreenWidth() };
 
             frame = [[UIScreen mainScreen] applicationFrame];
             if ([self modalPresentationStyle] == UIModalPresentationFormSheet) {
@@ -1253,13 +1255,13 @@ NSMutableDictionary* _pageMappings;
 
         int orientation = findOrientation(self);
         if (orientation == UIInterfaceOrientationPortrait) {
-            curPos.y += GetCACompositor()->screenHeight();
+            curPos.y += DisplayProperties::ScreenHeight();
         } else if (orientation == UIInterfaceOrientationPortraitUpsideDown) {
-            curPos.y -= GetCACompositor()->screenHeight();
+            curPos.y -= DisplayProperties::ScreenHeight();
         } else if (orientation == UIInterfaceOrientationLandscapeLeft) {
-            curPos.x += GetCACompositor()->screenWidth();
+            curPos.x += DisplayProperties::ScreenWidth();
         } else {
-            curPos.x -= GetCACompositor()->screenWidth();
+            curPos.x -= DisplayProperties::ScreenWidth();
         }
 
         [[UIApplication sharedApplication] beginIgnoringInteractionEvents];
@@ -1402,26 +1404,26 @@ NSMutableDictionary* _pageMappings;
 
                 int orientation = findOrientation(self);
                 if (orientation == UIInterfaceOrientationPortrait) {
-                    curPos.y += GetCACompositor()->screenHeight();
+                    curPos.y += DisplayProperties::ScreenHeight();
                 } else if (orientation == UIInterfaceOrientationPortraitUpsideDown) {
-                    curPos.y -= GetCACompositor()->screenHeight();
+                    curPos.y -= DisplayProperties::ScreenHeight();
                 } else if (orientation == UIInterfaceOrientationLandscapeLeft) {
-                    curPos.x += GetCACompositor()->screenWidth();
+                    curPos.x += DisplayProperties::ScreenWidth();
                 } else {
-                    curPos.x -= GetCACompositor()->screenWidth();
+                    curPos.x -= DisplayProperties::ScreenWidth();
                 }
 
                 CABasicAnimation* animation = [CABasicAnimation animationWithKeyPath:@"position"];
                 [animation setFromValue:[NSValue valueWithCGPoint:curPos]];
 
                 if (orientation == UIInterfaceOrientationPortrait) {
-                    curPos.y -= GetCACompositor()->screenHeight();
+                    curPos.y -= DisplayProperties::ScreenHeight();
                 } else if (orientation == UIInterfaceOrientationPortraitUpsideDown) {
-                    curPos.y += GetCACompositor()->screenHeight();
+                    curPos.y += DisplayProperties::ScreenHeight();
                 } else if (orientation == UIInterfaceOrientationLandscapeLeft) {
-                    curPos.x -= GetCACompositor()->screenWidth();
+                    curPos.x -= DisplayProperties::ScreenWidth();
                 } else {
-                    curPos.x += GetCACompositor()->screenWidth();
+                    curPos.x += DisplayProperties::ScreenWidth();
                 }
 
                 [animation setToValue:[NSValue valueWithCGPoint:curPos]];

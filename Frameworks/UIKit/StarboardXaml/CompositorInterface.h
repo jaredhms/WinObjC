@@ -22,48 +22,8 @@
 #include "winobjc\winobjc.h"
 #include <ppltasks.h>
 
-class DisplayTexture;
-class DisplayAnimation;
-
-typedef enum {
-    CompositionModeDefault = 0,
-    CompositionModeLibrary = 1,
-} CompositionMode;
-
-void CreateXamlCompositor(winobjc::Id& root, CompositionMode compositionMode);
-
-class DisplayAnimation : public std::enable_shared_from_this<DisplayAnimation> {
-public:
-    winobjc::Id _xamlAnimation;
-    enum Easing { EaseInEaseOut, EaseIn, EaseOut, Linear, Default };
-
-    double beginTime;
-    double duration;
-    bool autoReverse;
-    float repeatCount;
-    float repeatDuration;
-    float speed;
-    double timeOffset;
-    Easing easingFunction;
-
-    DisplayAnimation();
-    virtual ~DisplayAnimation(){};
-
-    virtual void Completed() = 0;
-    // TODO: CAN WE DO const ILayerProxy&????
-    virtual concurrency::task<void> AddToNode(ILayerProxy& node) = 0;
-
-    void CreateXamlAnimation();
-    void Start();
-    void Stop();
-
-    // TODO: CAN WE DO const ILayerProxy&????
-    concurrency::task<void> AddAnimation(
-        ILayerProxy& node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to);
-    // TODO: CAN WE DO const ILayerProxy&????
-    concurrency::task<void> AddTransitionAnimation(ILayerProxy& node, const char* type, const char* subtype);
-};
-
+/////////////////////////////////////////////////////////////////////////////////////////////
+// TODO: MOVE TO OWN FILE; MAYBE WITH THE OTHER BITMAP MANAGEMENT STUFF
 class DisplayTexture {
 public:
     virtual ~DisplayTexture(){};
@@ -72,8 +32,15 @@ public:
 protected:
     Microsoft::WRL::ComPtr<IInspectable> _xamlImage;
 };
+/////////////////////////////////////////////////////////////////////////////////////////////
 
-class CAXamlCompositor;
+typedef enum {
+    CompositionModeDefault = 0,
+    CompositionModeLibrary = 1,
+} CompositionMode;
+
+void CreateXamlCompositor(winobjc::Id& root, CompositionMode compositionMode);
+void SetScreenParameters(float width, float height, float scale, float rotation);
 
 struct ICompositorTransaction {
 public:
