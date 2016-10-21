@@ -567,7 +567,7 @@ public:
 
 }
 
-static std::shared_ptr<ILayerAnimation> CreateBasicAnimation(
+std::shared_ptr<ILayerAnimation> LayerAnimation::CreateBasicAnimation(
     CAAnimation* animation,
     NSString* propertyName,
     NSObject* fromValue,
@@ -577,7 +577,7 @@ static std::shared_ptr<ILayerAnimation> CreateBasicAnimation(
     return std::make_shared<BasicAnimation>(animation, propertyName, fromValue, toValue, byValue, timingProperties);
 }
 
-static std::shared_ptr<ILayerAnimation> CreateTransitionAnimation(
+std::shared_ptr<ILayerAnimation> LayerAnimation::CreateTransitionAnimation(
     CAAnimation* animation,
     NSString* type,
     NSString* subType) {
