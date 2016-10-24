@@ -44,7 +44,7 @@ bool IsTablet() {
 }
 
 void SetTablet(bool isTablet) {
-    TraceVerbose(TAG, L"SetTablet=%b", isTablet);
+    TraceVerbose(TAG, L"SetTablet=%d", isTablet);
     s_tabletMode = isTablet;
 }
 
