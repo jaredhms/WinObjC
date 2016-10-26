@@ -273,7 +273,7 @@ void DoApplicationLaunch(ActivationType activationType, Platform::Object^ activa
     auto rootFrame = ref new Xaml::Controls::Frame();
     rootFrame->Content = uiElem;
 
-    SetXamlRoot(uiElem, activationType);
+    XamlCompositor::Initialize(uiElem, activationType);
 
     if (activationType != ActivationTypeLibrary) {
         Xaml::Window::Current->Content = rootFrame;

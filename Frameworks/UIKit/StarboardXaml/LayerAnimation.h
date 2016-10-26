@@ -18,17 +18,10 @@
 #include "CACompositor.h"
 #include "winobjc\winobjc.h"
 
-#if defined(__OBJC__)
-#endif
-
-///////////////////////////////////////////////////////////////////////
-// TODO: Will be DisplayTexture.h if we move it to its own file too
-#include "CompositorInterface.h"
-///////////////////////////////////////////////////////////////////////
-
 #include <deque>
 #include <map>
 #include <memory>
+#include <ppltasks.h>
 
 class LayerAnimation : public ILayerAnimation, public std::enable_shared_from_this<LayerAnimation> {
 public:

@@ -16,40 +16,7 @@
 //******************************************************************************
 
 #import "Starboard.h"
-#include <COMIncludes.h>
-#import <WRLHelpers.h>
-#import <ErrorHandling.h>
-#import <RawBuffer.h>
-#import <wrl/client.h>
-#import <wrl/implements.h>
-#import <wrl/async.h>
-#import <wrl/wrappers/corewrappers.h>
-#import <windows.foundation.h>
-#include <COMIncludes_end.h>
-#import "CACompositor.h"
-#import "QuartzCore\CALayer.h"
-#import "CGContextInternal.h"
-#import "UIInterface.h"
-#import "UIColorInternal.h"
-#import "QuartzCore\CATransform3D.h"
-#import "Quaternion.h"
-
-#import <deque>
-#import <map>
-#import <mutex>
-#import <algorithm>
-#import "CompositorInterface.h"
-#import "CAAnimationInternal.h"
-#import "CALayerInternal.h"
-#import "UWP/interopBase.h"
-
-#import <LoggingNative.h>
-#import "StringHelpers.h"
-#import <MainDispatcher.h>
-
-#import <UWP/WindowsUIViewManagement.h>
-#import <UWP/WindowsDevicesInput.h>
-#import "UIColorInternal.h"
+#import "XamlCompositor.h"
 
 #import "DisplayProperties.h"
 #import "DisplayTexture.h"
@@ -57,21 +24,16 @@
 #import "LayerProxy.h"
 #import "LayerTransaction.h"
 
+#import "CGContextInternal.h"
 #import "UIApplicationInternal.h"
 
 using namespace Microsoft::WRL;
 
 static const wchar_t* TAG = L"CompositorInterface";
 
-@class RTObject;
+using namespace XamlCompositor::Internal;
 
 CompositionMode g_compositionMode = CompositionModeDefault;
-
-void SetRootGrid(winobjc::Id& root);
-
-// TODO: Move to a displaylink helper API?
-void EnableRenderingListener(void (*callback)());
-void DisableRenderingListener();
 
 void OnRenderedFrame() {
     CASignalDisplayLink();
@@ -153,15 +115,20 @@ void UIReleaseDisplayTextureForCGImage(CGImageRef img) {
     DisplayTexture::ClearCacheForCGImage(img);
 }
 
-void CreateXamlCompositor(winobjc::Id& root, CompositionMode compositionMode) {
+namespace XamlCompositor {
+namespace Internal {
+
+void CreateXamlCompositor(CompositionMode compositionMode) {
     g_compositionMode = compositionMode;
     CGImageAddDestructionListener(UIReleaseDisplayTextureForCGImage);
-    static CAXamlCompositor* compIntr = new CAXamlCompositor();
-    SetCACompositor(compIntr);
-    SetRootGrid(root);
+    static CAXamlCompositor* s_compositor = new CAXamlCompositor();
+    SetCACompositor(s_compositor);
 }
 
-void GridSizeChanged(float newWidth, float newHeight) {
+void RootGridSizeChanged(float newWidth, float newHeight) {
     [[UIApplication displayMode] _setWindowSize:CGSizeMake(newWidth, newHeight)];
     [[UIApplication displayMode] _updateDisplaySettings];
 }
+
+} /* namespace Internal */
+} /* namespace XamlCompositor */

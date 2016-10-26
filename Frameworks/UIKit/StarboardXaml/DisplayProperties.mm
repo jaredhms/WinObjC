@@ -14,11 +14,10 @@
 // THE SOFTWARE.
 //
 //******************************************************************************
-
 #import "Starboard.h"
 #import "DisplayProperties.h"
+#import "XamlCompositor.h"
 
-#import "CompositorInterface.h"
 #import "UIApplicationInternal.h"
 
 #import <algorithm>
@@ -131,7 +130,7 @@ void SetScreenSize(float width, float height, float scale, float rotationClockwi
     s_screenWidth = width;
     s_screenHeight = height;
     s_screenMagnification = scale;
-    SetScreenParameters(s_screenWidth, s_screenHeight, s_screenMagnification, rotationClockwise);
+    XamlCompositor::Internal::SetScreenParameters(s_screenWidth, s_screenHeight, s_screenMagnification, rotationClockwise);
 }
 
 float ScreenXDpi() {

@@ -17,11 +17,6 @@
 // clang-format off
 #pragma once
 
-///////////////////////////////////////////////////////////////////////
-// TODO: Will be DisplayTexture.h if we move it to its own file too
-#include "CompositorInterface.h"
-///////////////////////////////////////////////////////////////////////
-
 namespace CoreAnimation {
 
 public enum class ContentGravity {

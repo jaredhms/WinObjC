@@ -26,6 +26,8 @@
 
 static const wchar_t* TAG = L"LayerTransaction";
 
+using namespace XamlCompositor::Internal;
+
 class QueuedAnimation : public ICompositorAnimationTransaction {
 public:
     CALayer* _layer = nil;

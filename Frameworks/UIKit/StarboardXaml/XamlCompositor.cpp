@@ -16,6 +16,8 @@
 // clang-format does not like C++/CX
 // clang-format off
 
+#include "XamlCompositor.h"
+
 #include <wrl/client.h>
 #include <memory>
 #include <agile.h>
@@ -26,7 +28,6 @@
 
 #include "winobjc\winobjc.h"
 #include "ApplicationCompositor.h"
-#include "CompositorInterface.h"
 #include <StringHelpers.h>
 
 #include "DisplayProperties.h"
@@ -39,34 +40,39 @@ using namespace Windows::Storage::Streams;
 using namespace Windows::UI::Xaml;
 using namespace Windows::UI::Xaml::Controls;
 using namespace Windows::UI::Xaml::Media;
+using namespace XamlCompositor::Internal;
 
-Grid^ rootNode;
-Canvas^ windowCollection;
-
-void GridSizeChanged(float newWidth, float newHeight);
+Grid^ s_rootGrid;
+Canvas^ s_windowCollection;
 
 void OnGridSizeChanged(Platform::Object^ sender, SizeChangedEventArgs^ e) {
     Windows::Foundation::Size newSize = e->NewSize;
-    GridSizeChanged(newSize.Width, newSize.Height);
+    RootGridSizeChanged(newSize.Width, newSize.Height);
 }
 
-void SetRootGrid(winobjc::Id& root) {
-    rootNode = (Grid^)(Platform::Object^)root;
+namespace XamlCompositor {
 
-    // canvas serves as the container for UI windows, thus named as windowCollection
-    windowCollection = ref new Canvas();
-    windowCollection->HorizontalAlignment = HorizontalAlignment::Center;
-    windowCollection->VerticalAlignment = VerticalAlignment::Center;
+void Initialize(Windows::UI::Xaml::Controls::Grid^ rootGrid, ActivationType activationType) {
+    Internal::CreateXamlCompositor(((activationType == ActivationTypeLibrary) ? CompositionModeLibrary : CompositionModeDefault));
+
+    s_rootGrid = rootGrid;
+
+    // canvas serves as the container for UI windows, thus named as s_windowCollection
+    s_windowCollection = ref new Canvas();
+    s_windowCollection->HorizontalAlignment = HorizontalAlignment::Center;
+    s_windowCollection->VerticalAlignment = VerticalAlignment::Center;
 
     // For the canvas servering window collection, we give it a special name
     // useful for later when we try to locate this canvas
-    windowCollection->Name = L"windowCollection";
+    s_windowCollection->Name = L"windowCollection";
 
-    rootNode->Children->Append(windowCollection);
-    rootNode->InvalidateArrange();
+    s_rootGrid->Children->Append(s_windowCollection);
+    s_rootGrid->InvalidateArrange();
 
-    rootNode->SizeChanged += ref new SizeChangedEventHandler(&OnGridSizeChanged);
+    s_rootGrid->SizeChanged += ref new SizeChangedEventHandler(&OnGridSizeChanged);
 }
+
+namespace Internal {
 
 void (*RenderCallback)() = nullptr;
 
@@ -117,12 +123,12 @@ void DisableRenderingListener() {
 }
 
 void SetScreenParameters(float width, float height, float magnification, float rotation) {
-    windowCollection->Width = width;
-    windowCollection->Height = height;
-    windowCollection->InvalidateArrange();
-    windowCollection->InvalidateMeasure();
-    rootNode->InvalidateArrange();
-    rootNode->InvalidateMeasure();
+    s_windowCollection->Width = width;
+    s_windowCollection->Height = height;
+    s_windowCollection->InvalidateArrange();
+    s_windowCollection->InvalidateMeasure();
+    s_rootGrid->InvalidateArrange();
+    s_rootGrid->InvalidateMeasure();
 
     TransformGroup^ globalTransform = ref new TransformGroup();
     ScaleTransform^ windowScale = ref new ScaleTransform();
@@ -130,24 +136,19 @@ void SetScreenParameters(float width, float height, float magnification, float r
 
     windowScale->ScaleX = magnification;
     windowScale->ScaleY = magnification;
-    windowScale->CenterX = windowCollection->Width / 2.0;
-    windowScale->CenterY = windowCollection->Height / 2.0;
+    windowScale->CenterX = s_windowCollection->Width / 2.0;
+    windowScale->CenterY = s_windowCollection->Height / 2.0;
 
     globalTransform->Children->Append(windowScale);
     if (rotation != 0.0) {
         orientation->Angle = rotation;
-        orientation->CenterX = windowCollection->Width / 2.0;
-        orientation->CenterY = windowCollection->Height / 2.0;
+        orientation->CenterX = s_windowCollection->Width / 2.0;
+        orientation->CenterY = s_windowCollection->Height / 2.0;
 
         globalTransform->Children->Append(orientation);
     }
 
-    windowCollection->RenderTransform = globalTransform;
-}
-
-void SetXamlRoot(Windows::UI::Xaml::Controls::Grid^ grid, ActivationType activationType) {
-    winobjc::Id gridObj((Platform::Object^)grid);
-    CreateXamlCompositor(gridObj, ((activationType == ActivationTypeLibrary) ? CompositionModeLibrary : CompositionModeDefault));
+    s_windowCollection->RenderTransform = globalTransform;
 }
 
 void DispatchCompositorTransactions(
@@ -187,3 +188,6 @@ void DispatchCompositorTransactions(
         }
     }, concurrency::task_continuation_context::use_current());
 }
+
+} /* namespace Internal */
+} /* namespace XamlCompositor */

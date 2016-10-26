@@ -34,7 +34,7 @@ static const wchar_t* TAG = L"LayerProxy";
 
 //////////////////////////////////////////////////////////////////
 // TODO: WE SHOULD GET RID OF THIS OR MORE FORMALLY EXPOSE IT
-extern Canvas^ windowCollection;
+extern Canvas^ s_windowCollection;
 //////////////////////////////////////////////////////////////////
 
 __inline FrameworkElement^ _FrameworkElementFromInspectable(const ComPtr<IInspectable>& element) {
@@ -179,7 +179,7 @@ void LayerProxy::SetContents(const Microsoft::WRL::ComPtr<IInspectable>& bitmap,
 
 void LayerProxy::AddToRoot() {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
-    windowCollection->Children->Append(xamlLayer);
+    s_windowCollection->Children->Append(xamlLayer);
     SetMasksToBounds(true);
     _isRoot = true;
 }
@@ -285,7 +285,7 @@ void LayerProxy::RemoveFromSuperLayer() {
     FrameworkElement^ xamlElementForThisLayer = _FrameworkElementFromInspectable(_xamlElement);
     Panel^ subLayerPanelForParentLayer;
     if (_isRoot) {
-        subLayerPanelForParentLayer = (Panel^)(Platform::Object^)windowCollection;
+        subLayerPanelForParentLayer = s_windowCollection;
     } else {
         if (!_parent) {
             return;

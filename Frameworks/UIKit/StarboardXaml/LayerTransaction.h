@@ -17,11 +17,7 @@
 
 #include "CACompositor.h"
 #include "winobjc\winobjc.h"
-
-///////////////////////////////////////////////////////////////////////
-// TODO: Will be DisplayTexture.h if we move it to its own file too
-#include "CompositorInterface.h"
-///////////////////////////////////////////////////////////////////////
+#include "XamlCompositor.h"
 
 #include <deque>
 #include <map>
@@ -33,6 +29,9 @@
 class QueuedProperty;
 class QueuedMovement;
 class QueuedAnimation;
+
+using ICompositorTransaction = XamlCompositor::Internal::ICompositorTransaction;
+using ICompositorAnimationTransaction = XamlCompositor::Internal::ICompositorAnimationTransaction;
 
 class LayerTransaction : public ILayerTransaction, public ICompositorTransaction {
 public:

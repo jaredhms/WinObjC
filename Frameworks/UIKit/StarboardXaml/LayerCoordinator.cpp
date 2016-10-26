@@ -21,6 +21,8 @@
 
 #include <ErrorHandling.h>
 
+#include <map>
+
 using namespace Platform;
 using namespace UIKit::Private::CoreAnimation;
 using namespace Windows::Foundation;
