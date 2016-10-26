@@ -26,7 +26,6 @@
 #include <collection.h>
 #include <assert.h>
 
-#include "winobjc\winobjc.h"
 #include "ApplicationCompositor.h"
 #include <StringHelpers.h>
 

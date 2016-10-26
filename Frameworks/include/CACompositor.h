@@ -28,8 +28,6 @@
 #import <windows.foundation.h>
 #include <COMIncludes_end.h>
 
-#include "winobjc\winobjc.h"
-
 #else
 
 #include <memory>

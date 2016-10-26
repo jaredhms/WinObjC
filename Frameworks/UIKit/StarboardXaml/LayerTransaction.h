@@ -16,7 +16,6 @@
 #pragma once
 
 #include "CACompositor.h"
-#include "winobjc\winobjc.h"
 #include "XamlCompositor.h"
 
 #include <deque>

@@ -21,6 +21,7 @@
 
 #include <ErrorHandling.h>
 
+#include <algorithm>
 #include <map>
 
 using namespace Platform;
