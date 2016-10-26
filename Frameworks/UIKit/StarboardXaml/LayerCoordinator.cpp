@@ -49,9 +49,6 @@ using ApplyAnimationFunction = std::function<void(FrameworkElement^ target, Stor
 using ApplyTransformFunction = std::function<void (FrameworkElement^ target, Object^ toValue)>;
 using GetCurrentValueFunction = std::function<Object^ (FrameworkElement^ target)>;
 
-/////////////////////////////////////////////////////////
-// TODO: SWITCH TO STD::FUNCTIONS
-/////////////////////////////////////////////////////////
 struct AnimatableProperty {
 public:
     ApplyAnimationFunction AnimateValue;
@@ -1039,7 +1036,8 @@ void LayerCoordinator::_sizeChangedCallback(DependencyObject^ sender, Dependency
     auto element = safe_cast<FrameworkElement^>(sender);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
-    // TODO: Revisit whether or not we actually need this - it can't be very performant...?
+    // TODO: This is what we were doing before, but we should 
+    //       revisit whether or not we actually need this, as it can't be very performant...?
     // element->InvalidateArrange();
     //////////////////////////////////////////////////////////////////////////////////////////////
 
