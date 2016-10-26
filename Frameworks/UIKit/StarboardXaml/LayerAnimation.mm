@@ -469,8 +469,8 @@ public:
             float fromValue = [(NSNumber*)_fromValue floatValue];
             float toValue = [(NSNumber*)_toValue floatValue];
 
-            _AddAnimation(layer, L"transform.scale.x", _fromValue != nil, fromValue, _toValue != nil, toValue);
-            _AddAnimation(layer, L"transform.scale.y", _fromValue != nil, fromValue, _toValue != nil, toValue);
+            _AddAnimation(layer, "transform.scale.x", _fromValue != nil, fromValue, _toValue != nil, toValue);
+            _AddAnimation(layer, "transform.scale.y", _fromValue != nil, fromValue, _toValue != nil, toValue);
             _Start();
         } else if (strcmp(propName, "transform.rotation.z") == 0) {
             _AdjustFloatValuesForKeyPath(_propertyName);
@@ -480,45 +480,45 @@ public:
             fromValue = fromValue * 180.0f / M_PI;
             toValue = toValue * 180.0f / M_PI;
 
-            _AddAnimation(layer, L"transform.rotation", _fromValue != nil, fromValue, _toValue != nil, toValue);
+            _AddAnimation(layer, "transform.rotation", _fromValue != nil, fromValue, _toValue != nil, toValue);
             _Start();
         } else if (strcmp(propName, "transform.translation.x") == 0) {
             _AdjustFloatValuesForKeyPath(_propertyName);
             float fromValue = [(NSNumber*)_fromValue floatValue];
             float toValue = [(NSNumber*)_toValue floatValue];
 
-            _AddAnimation(layer, L"transform.translation.x", _fromValue != nil, fromValue, _toValue != nil, toValue);
+            _AddAnimation(layer, "transform.translation.x", _fromValue != nil, fromValue, _toValue != nil, toValue);
             _Start();
         } else if (strcmp(propName, "transform.translation.y") == 0) {
             _AdjustFloatValuesForKeyPath(_propertyName);
             float fromValue = [(NSNumber*)_fromValue floatValue];
             float toValue = [(NSNumber*)_toValue floatValue];
 
-            _AddAnimation(layer, L"transform.translation.y", _fromValue != nil, fromValue, _toValue != nil, toValue);
+            _AddAnimation(layer, "transform.translation.y", _fromValue != nil, fromValue, _toValue != nil, toValue);
             _Start();
         } else if (strcmp(propName, "position") == 0) {
             _AdjustCGPointValuesForKeyPath(_propertyName);
             CGPoint fromValue = [(NSValue*)_fromValue CGPointValue];
             CGPoint toValue = [(NSValue*)_toValue CGPointValue];
 
-            _AddAnimation(layer, L"position.x", _fromValue != nil, fromValue.x, _toValue != nil, toValue.x);
-            _AddAnimation(layer, L"position.y", _fromValue != nil, fromValue.y, _toValue != nil, toValue.y);
+            _AddAnimation(layer, "position.x", _fromValue != nil, fromValue.x, _toValue != nil, toValue.x);
+            _AddAnimation(layer, "position.y", _fromValue != nil, fromValue.y, _toValue != nil, toValue.y);
             _Start();
         } else if (strcmp(propName, "bounds") == 0) {
             _AdjustCGRectValuesForKeyPath(_propertyName);
             CGRect fromValue = [(NSValue*)_fromValue CGRectValue];
             CGRect toValue = [(NSValue*)_toValue CGRectValue];
 
-            _AddAnimation(layer, L"origin.x", _fromValue != nil, fromValue.origin.x, _toValue != nil, toValue.origin.x);
-            _AddAnimation(layer, L"origin.y", _fromValue != nil, fromValue.origin.y, _toValue != nil, toValue.origin.y);
-            _AddAnimation(layer, L"size.width", _fromValue != nil, fromValue.size.width, _toValue != nil, toValue.size.width);
-            _AddAnimation(layer, L"size.height", _fromValue != nil, fromValue.size.height, _toValue != nil, toValue.size.height);
+            _AddAnimation(layer, "origin.x", _fromValue != nil, fromValue.origin.x, _toValue != nil, toValue.origin.x);
+            _AddAnimation(layer, "origin.y", _fromValue != nil, fromValue.origin.y, _toValue != nil, toValue.origin.y);
+            _AddAnimation(layer, "size.width", _fromValue != nil, fromValue.size.width, _toValue != nil, toValue.size.width);
+            _AddAnimation(layer, "size.height", _fromValue != nil, fromValue.size.height, _toValue != nil, toValue.size.height);
             _Start();
         } else if (strcmp(propName, "opacity") == 0) {
             _AdjustFloatValuesForKeyPath(_propertyName);
             float fromValue = [(NSNumber*)_fromValue floatValue];
             float toValue = [(NSNumber*)_toValue floatValue];
-            _AddAnimation(layer, L"opacity", _fromValue != nil, fromValue, _toValue != nil, toValue);
+            _AddAnimation(layer, "opacity", _fromValue != nil, fromValue, _toValue != nil, toValue);
             _Start();
         } else if (strcmp(propName, "transform") == 0) {
             CATransform3D fromValue = [(NSValue*)_fromValue CATransform3DValue];
@@ -534,15 +534,15 @@ public:
             bool isValid = _AdjustCATransform3DValues(translationFrom, scaleFrom, &angleFrom, translationTo, scaleTo, &angleTo);
 
             if (scaleFrom[0] != 1.0f || scaleFrom[1] != 1.0f || scaleTo[0] != 1.0f || scaleTo[1] != 1.0f) {
-                _AddAnimation(layer, L"transform.scale.x", isValid, scaleFrom[0], isValid, scaleTo[0]);
-                _AddAnimation(layer, L"transform.scale.y", isValid, scaleFrom[1], isValid, scaleTo[1]);
+                _AddAnimation(layer, "transform.scale.x", isValid, scaleFrom[0], isValid, scaleTo[0]);
+                _AddAnimation(layer, "transform.scale.y", isValid, scaleFrom[1], isValid, scaleTo[1]);
             }
             if (translationFrom[0] != 0.0f || translationFrom[1] != 0.0f || translationTo[0] != 0.0f || translationTo[1] != 0.0f) {
-                _AddAnimation(layer, L"transform.translation.x", isValid, translationFrom[0], isValid, translationTo[0]);
-                _AddAnimation(layer, L"transform.translation.y", isValid, translationFrom[1], isValid, translationTo[1]);
+                _AddAnimation(layer, "transform.translation.x", isValid, translationFrom[0], isValid, translationTo[0]);
+                _AddAnimation(layer, "transform.translation.y", isValid, translationFrom[1], isValid, translationTo[1]);
             }
             if (angleFrom != 0.0f || angleTo != 0.0f) {
-                _AddAnimation(layer, L"transform.rotation", isValid, angleFrom, isValid, angleTo);
+                _AddAnimation(layer, "transform.rotation", isValid, angleFrom, isValid, angleTo);
             }
             _Start();
         } else if (strcmp(propName, "transform.translation.y") == 0) {
@@ -550,14 +550,14 @@ public:
             float fromValue = [(NSNumber*)_fromValue floatValue];
             float toValue = [(NSNumber*)_toValue floatValue];
 
-            _AddAnimation(layer, L"transform.translation.y", _fromValue != nil, fromValue, _toValue != nil, toValue);
+            _AddAnimation(layer, "transform.translation.y", _fromValue != nil, fromValue, _toValue != nil, toValue);
             _Start();
         } else if (strcmp(propName, "transform.translation.x") == 0) {
             _AdjustFloatValuesForKeyPath(_propertyName);
             float fromValue = [(NSNumber*)_fromValue floatValue];
             float toValue = [(NSNumber*)_toValue floatValue];
 
-            _AddAnimation(layer, L"transform.translation.x", _fromValue != nil, fromValue, _toValue != nil, toValue);
+            _AddAnimation(layer, "transform.translation.x", _fromValue != nil, fromValue, _toValue != nil, toValue);
             _Start();
         } else {
             UNIMPLEMENTED_WITH_MSG("Stubbed function called! Unsupported property name: %hs", propName);

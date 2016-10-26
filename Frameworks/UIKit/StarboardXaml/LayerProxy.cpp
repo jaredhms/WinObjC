@@ -69,7 +69,7 @@ LayerProxy::LayerProxy(IInspectable* xamlElement) :
     }
 
     // Initialize the UIElement with CoreAnimation
-    CoreAnimation::LayerProperties::InitializeFrameworkElement(_FrameworkElementFromInspectable(_xamlElement));
+    CoreAnimation::LayerCoordinator::InitializeFrameworkElement(_FrameworkElementFromInspectable(_xamlElement));
 }
 
 LayerProxy::~LayerProxy() {
@@ -84,56 +84,49 @@ Microsoft::WRL::ComPtr<IInspectable> LayerProxy::GetXamlElement() {
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // TODO: This should just happen in UIWindow.mm and should get deleted from here
-void LayerProxy::SetZIndex(int zIndex) {
+void LayerProxy::_SetZIndex(int zIndex) {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
     xamlLayer->SetValue(Canvas::ZIndexProperty, zIndex);
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 
-void LayerProxy::SetProperty(const wchar_t* name, float value) {
+void LayerProxy::_SetProperty(const char* name, float value) {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
-    CoreAnimation::LayerProperties::SetValue(xamlLayer, ref new Platform::String(name), (double)value);
+    CoreAnimation::LayerCoordinator::SetValue(xamlLayer, name, (double)value);
 }
 
-void LayerProxy::SetPropertyInt(const wchar_t* name, int value) {
+void LayerProxy::_SetPropertyInt(const char* name, int value) {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
-    CoreAnimation::LayerProperties::SetValue(xamlLayer, ref new Platform::String(name), (int)value);
+    CoreAnimation::LayerCoordinator::SetValue(xamlLayer, name, value);
 }
 
-void LayerProxy::SetHidden(bool hidden) {
+void LayerProxy::_SetHidden(bool hidden) {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
     xamlLayer->Visibility = (hidden ? Visibility::Collapsed : Visibility::Visible);
 }
 
-void LayerProxy::SetMasksToBounds(bool masksToBounds) {
+void LayerProxy::_SetMasksToBounds(bool masksToBounds) {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
-    CoreAnimation::LayerProperties::SetValue(xamlLayer, "masksToBounds", masksToBounds);
+    CoreAnimation::LayerCoordinator::SetValue(xamlLayer, "masksToBounds", masksToBounds);
 }
 
 float LayerProxy::_GetPresentationPropertyValue(const char* name) {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
-    std::string str(name);
-    std::wstring wstr(str.begin(), str.end());
-    return (float)(double)CoreAnimation::LayerProperties::GetValue(xamlLayer, ref new Platform::String(wstr.data()));
+    return (float)(double)CoreAnimation::LayerCoordinator::GetValue(xamlLayer, name);
 }
 
-void LayerProxy::SetContentsCenter(float x, float y, float width, float height) {
+void LayerProxy::_SetContentsCenter(float x, float y, float width, float height) {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
-    CoreAnimation::LayerProperties::SetContentCenter(xamlLayer, Rect(x, y, width, height));
+    CoreAnimation::LayerCoordinator::SetContentCenter(xamlLayer, Rect(x, y, width, height));
 }
 
-/////////////////////////////////////////////////////////////
-// TODO: FIND A WAY TO REMOVE THIS?
+// TODO: Find a way to remove this
 void LayerProxy::SetTopMost() {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
     _topMost = true;
-    // xamlLayer->SetTopMost();
-    // Worst case, this becomes:
-    // xamlLayer -> _SetContent(nullptr);
-    // xamlLayer -> __super::Background = nullptr;
 }
 
-void LayerProxy::SetBackgroundColor(float r, float g, float b, float a) {
+void LayerProxy::_SetBackgroundColor(float r, float g, float b, float a) {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
 
     SolidColorBrush^ backgroundBrush = nullptr; // A null brush is transparent and not hit-testable
@@ -167,20 +160,20 @@ void LayerProxy::SetShouldRasterize(bool rasterize) {
     }
 }
 
-void LayerProxy::SetContents(const Microsoft::WRL::ComPtr<IInspectable>& bitmap, float width, float height, float scale) {
+void LayerProxy::_SetContents(const Microsoft::WRL::ComPtr<IInspectable>& bitmap, float width, float height, float scale) {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
     if (bitmap) {
         auto content = dynamic_cast<Media::ImageSource^>(reinterpret_cast<Platform::Object^>(bitmap.Get()));
-        CoreAnimation::LayerProperties::SetContent(xamlLayer, content, width, height, scale);
+        CoreAnimation::LayerCoordinator::SetContent(xamlLayer, content, width, height, scale);
     } else {
-        CoreAnimation::LayerProperties::SetContent(xamlLayer, nullptr, width, height, scale);
+        CoreAnimation::LayerCoordinator::SetContent(xamlLayer, nullptr, width, height, scale);
     }
 }
 
 void LayerProxy::AddToRoot() {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
     s_windowCollection->Children->Append(xamlLayer);
-    SetMasksToBounds(true);
+    _SetMasksToBounds(true);
     _isRoot = true;
 }
 

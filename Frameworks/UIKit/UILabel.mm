@@ -117,6 +117,9 @@
     [_textBlock setTextAlignment:ConvertUITextAlignmentToWXTextAlignment(_alignment)];
 
     [_textBlock setLineStackingStrategy:WXLineStackingStrategyBlockLineHeight];
+
+    // TODO: Make sure MM renders properly with/without this
+    // The first 'welcome' label is truncated vertically
     [_textBlock setLineHeight:[_font ascender] - [_font descender]];
 
     switch (_lineBreakMode) {

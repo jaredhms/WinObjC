@@ -38,7 +38,7 @@ namespace CoreAnimation {
 
 static const double c_hundredNanoSeconds = 10000000.0;
 
-EventedStoryboard::EventedStoryboard(
+StoryboardManager::StoryboardManager(
     double beginTime, double duration, bool autoReverse, float repeatCount, float repeatDuration, float speed, double timeOffset) {
     TimeSpan beginTimeSpan = TimeSpan();
     beginTimeSpan.Duration = (long long)(beginTime * c_hundredNanoSeconds);
@@ -65,15 +65,15 @@ EventedStoryboard::EventedStoryboard(
     });
 }
 
-void EventedStoryboard::Start() {
+void StoryboardManager::Start() {
     m_container->Begin();
 }
 
-void EventedStoryboard::Stop() {
+void StoryboardManager::Stop() {
     m_container->Stop();
 }
 
-void EventedStoryboard::_CreateFlip(Layer^ layer, bool flipRight, bool invert, bool removeFromParent) {
+void StoryboardManager::_CreateFlip(Layer^ layer, bool flipRight, bool invert, bool removeFromParent) {
     if (layer->Projection == nullptr) {
         layer->Projection = ref new PlaneProjection();
     }
@@ -98,8 +98,8 @@ void EventedStoryboard::_CreateFlip(Layer^ layer, bool flipRight, bool invert, b
         }
     }
 
-    ((PlaneProjection^)layer->Projection)->CenterOfRotationX = LayerProperties::GetVisualWidth(layer) / 2;
-    ((PlaneProjection^)layer->Projection)->CenterOfRotationY = LayerProperties::GetVisualHeight(layer) / 2;
+    ((PlaneProjection^)layer->Projection)->CenterOfRotationX = LayerCoordinator::GetVisualWidth(layer) / 2;
+    ((PlaneProjection^)layer->Projection)->CenterOfRotationY = LayerCoordinator::GetVisualHeight(layer) / 2;
     Storyboard::SetTargetProperty(rotateAnim, "(UIElement.Projection).(PlaneProjection.RotationY)");
     Storyboard::SetTarget(rotateAnim, layer);
     m_container->Children->Append(rotateAnim);
@@ -154,7 +154,7 @@ void EventedStoryboard::_CreateFlip(Layer^ layer, bool flipRight, bool invert, b
     m_container->Children->Append(fade1);
 }
 
-void EventedStoryboard::_CreateWoosh(Layer^ layer, bool fromRight, bool invert, bool removeFromParent) {
+void StoryboardManager::_CreateWoosh(Layer^ layer, bool fromRight, bool invert, bool removeFromParent) {
     if (layer->Projection == nullptr) {
         layer->Projection = ref new PlaneProjection();
     }
@@ -166,18 +166,18 @@ void EventedStoryboard::_CreateWoosh(Layer^ layer, bool fromRight, bool invert, 
 
     if (!invert) {
         if (fromRight) {
-            wooshAnim->From = (double)LayerProperties::GetVisualWidth(layer);
+            wooshAnim->From = (double)LayerCoordinator::GetVisualWidth(layer);
             wooshAnim->To = 0.01;
         } else {
             wooshAnim->From = 0.01;
-            wooshAnim->To = (double)LayerProperties::GetVisualWidth(layer);
+            wooshAnim->To = (double)LayerCoordinator::GetVisualWidth(layer);
         }
     } else {
         if (fromRight) {
             wooshAnim->From = 0.01;
-            wooshAnim->To = (double)(-LayerProperties::GetVisualWidth(layer) / 4);
+            wooshAnim->To = (double)(-LayerCoordinator::GetVisualWidth(layer) / 4);
         } else {
-            wooshAnim->From = (double)(-LayerProperties::GetVisualWidth(layer) / 4);
+            wooshAnim->From = (double)(-LayerCoordinator::GetVisualWidth(layer) / 4);
             wooshAnim->To = 0.01;
         }
     }
@@ -199,63 +199,7 @@ void EventedStoryboard::_CreateWoosh(Layer^ layer, bool fromRight, bool invert, 
     m_container->Children->Append(wooshAnim);
 }
 
-////////////////////////////////////////////////////////
-// TODO: MOVE TO STATIC FUNCTION ON LAYERANIMATION?
-concurrency::task<Layer^> EventedStoryboard::SnapshotLayer(Layer^ layer) {
-    if (((layer->Height == 0) && (layer->Width == 0)) || (layer->Opacity == 0)) {
-        return concurrency::task_from_result<Layer^>(nullptr);
-    }
-    else {
-        RenderTargetBitmap^ snapshot = ref new RenderTargetBitmap();
-        return concurrency::create_task(
-                snapshot->RenderAsync(layer, static_cast<int>(LayerProperties::GetVisualWidth(layer) * DisplayProperties::RawScreenScale()), 0))
-            .then([snapshot, layer](concurrency::task<void> result) noexcept {
-            try {
-                result.get();
-            } catch (Platform::InvalidArgumentException^ ex) {
-                // Handle exceptions related to invalid layer attribute passed to RenderAsync
-                TraceWarning(TAG,
-                             L"RenderAsync threw InvalidArgumentException exception - [%ld]%s",
-                             ex->HResult,
-                             ex->Message);
-                return static_cast<Layer^>(nullptr);
-            }
-
-            // Return a new 'copy' layer with the rendered content
-            Layer^ newLayer = ref new Layer();
-            LayerProperties::InitializeFrameworkElement(newLayer);
-
-            // Copy display properties from the old layer to the new layer
-            LayerProperties::SetValue(newLayer, "opacity", LayerProperties::GetValue(layer, "opacity"));
-            LayerProperties::SetValue(newLayer, "position", LayerProperties::GetValue(layer, "position"));
-            LayerProperties::SetValue(newLayer, "size", LayerProperties::GetValue(layer, "size"));
-            LayerProperties::SetValue(newLayer, "anchorPoint", LayerProperties::GetValue(layer, "anchorPoint"));
-
-            int width = snapshot->PixelWidth;
-            int height = snapshot->PixelHeight;
-            auto dispInfo = Windows::Graphics::Display::DisplayInformation::GetForCurrentView();
-
-            // Set the snapshot as the content of the new layer
-            LayerProperties::SetContent(
-                newLayer, 
-                snapshot,
-                static_cast<float>(width),
-                static_cast<float>(height), 
-                static_cast<float>(DisplayProperties::RawScreenScale() * dispInfo->RawPixelsPerViewPixel));
-
-            // There seems to be a bug in Xaml where Render'd layers get sized to their visible content... sort of.
-            // If the UIViewController being transitioned away from has transparent content, the height returned is less the
-            // navigation bar, as though Xaml sizes the buffer to the largest child Visual, and only expands where needed.
-            // Top/bottom switched due to geometric origin of CALayer so read this as UIViewContentModeTopLeft
-            LayerProperties::SetContentGravity(newLayer, ContentGravity::BottomLeft);
-
-            return newLayer;
-        }, concurrency::task_continuation_context::use_current());
-    }
-}
-////////////////////////////////////////////////////////
-
-void EventedStoryboard::AddTransition(Layer^ realLayer, Layer^ snapshotLayer, String^ type, String^ subtype) {
+void StoryboardManager::AddTransition(Layer^ realLayer, Layer^ snapshotLayer, String^ type, String^ subtype) {
     if (type == "kCATransitionFlip") {
         TimeSpan timeSpan = TimeSpan();
         timeSpan.Duration = (long long)(0.75 * c_hundredNanoSeconds);
@@ -320,11 +264,11 @@ void EventedStoryboard::AddTransition(Layer^ realLayer, Layer^ snapshotLayer, St
     }
 }
 
-void EventedStoryboard::Animate(FrameworkElement^ layer, String^ propertyName, Object^ from, Object^ to) {
+void StoryboardManager::Animate(FrameworkElement^ layer, const char* propertyName, Object^ from, Object^ to) {
     DoubleAnimation^ timeline = ref new DoubleAnimation();
     timeline->Duration = m_container->Duration;
     timeline->EasingFunction = m_animationEase;
-    LayerProperties::AnimateValue(layer, m_container, timeline, propertyName, from, to);
+    LayerCoordinator::AnimateValue(layer, m_container, timeline, propertyName, from, to);
 }
 
 } /* namespace CoreAnimation */

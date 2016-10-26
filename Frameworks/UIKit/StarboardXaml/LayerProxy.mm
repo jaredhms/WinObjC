@@ -24,9 +24,9 @@
 
 static const wchar_t* TAG = L"LayerProxy";
 
-void LayerProxy::SetTexture(const std::shared_ptr<IDisplayTexture>& texture, float width, float height, float contentScale) {
+void LayerProxy::_SetTexture(const std::shared_ptr<IDisplayTexture>& texture, float width, float height, float contentScale) {
     _currentTexture = texture;
-    SetContents((texture ? texture->GetContent() : nullptr), width, height, contentScale);
+    _SetContents((texture ? texture->GetContent() : nullptr), width, height, contentScale);
 }
 
 void* LayerProxy::GetPropertyValue(const char* name) {
@@ -99,35 +99,35 @@ void LayerProxy::UpdateProperty(const char* name, void* value) {
 
     if (strcmp(name, "contentsCenter") == 0) {
         CGRect value = [(NSValue*)newValue CGRectValue];
-        SetContentsCenter(value.origin.x, value.origin.y, value.size.width, value.size.height);
+        _SetContentsCenter(value.origin.x, value.origin.y, value.size.width, value.size.height);
     } else if (strcmp(name, "anchorPoint") == 0) {
         CGPoint value = [(NSValue*)newValue CGPointValue];
-        SetProperty(L"anchorPoint.x", value.x);
-        SetProperty(L"anchorPoint.y", value.y);
+        _SetProperty("anchorPoint.x", value.x);
+        _SetProperty("anchorPoint.y", value.y);
     } else if (strcmp(name, "position") == 0) {
         CGPoint position = [(NSValue*)newValue CGPointValue];
-        SetProperty(L"position.x", position.x);
-        SetProperty(L"position.y", position.y);
+        _SetProperty("position.x", position.x);
+        _SetProperty("position.y", position.y);
     } else if (strcmp(name, "bounds.origin") == 0) {
         CGPoint value = [(NSValue*)newValue CGPointValue];
-        SetProperty(L"origin.x", value.x);
-        SetProperty(L"origin.y", value.y);
+        _SetProperty("origin.x", value.x);
+        _SetProperty("origin.y", value.y);
     } else if (strcmp(name, "bounds.size") == 0) {
         CGSize size = [(NSValue*)newValue CGSizeValue];
-        SetProperty(L"size.width", size.width);
-        SetProperty(L"size.height", size.height);
+        _SetProperty("size.width", size.width);
+        _SetProperty("size.height", size.height);
     } else if (strcmp(name, "opacity") == 0) {
         float value = [(NSNumber*)newValue floatValue];
-        SetProperty(L"opacity", value);
+        _SetProperty("opacity", value);
     } else if (strcmp(name, "hidden") == 0) {
         bool value = [(NSNumber*)newValue boolValue];
-        SetHidden(value);
+        _SetHidden(value);
     } else if (strcmp(name, "masksToBounds") == 0) {
         if (!_isRoot) {
             bool value = [(NSNumber*)newValue boolValue];
-            SetMasksToBounds(value);
+            _SetMasksToBounds(value);
         } else {
-            SetMasksToBounds(true);
+            _SetMasksToBounds(true);
         }
     } else if (strcmp(name, "transform") == 0) {
         CATransform3D value = [(NSValue*)newValue CATransform3DValue];
@@ -140,11 +140,11 @@ void LayerProxy::UpdateProperty(const char* name, void* value) {
         CATransform3DGetScale(value, scale);
         CATransform3DGetPosition(value, translation);
 
-        SetProperty(L"transform.rotation", (float)-qFrom.roll() * 180.0f / M_PI);
-        SetProperty(L"transform.scale.x", scale[0]);
-        SetProperty(L"transform.scale.y", scale[1]);
-        SetProperty(L"transform.translation.x", translation[0]);
-        SetProperty(L"transform.translation.y", translation[1]);
+        _SetProperty("transform.rotation", (float)-qFrom.roll() * 180.0f / M_PI);
+        _SetProperty("transform.scale.x", scale[0]);
+        _SetProperty("transform.scale.y", scale[1]);
+        _SetProperty("transform.translation.x", translation[0]);
+        _SetProperty("transform.translation.y", translation[1]);
     } else if (strcmp(name, "contentsScale") == 0) {
         UNIMPLEMENTED_WITH_MSG("contentsScale not implemented");
     } else if (strcmp(name, "contentsOrientation") == 0) {
@@ -159,21 +159,21 @@ void LayerProxy::UpdateProperty(const char* name, void* value) {
         } else if (position == UIImageOrientationRight) {
             toPosition = 90;
         }
-        SetProperty(L"transform.rotation", toPosition);
+        _SetProperty("transform.rotation", toPosition);
     } else if (strcmp(name, "zIndex") == 0) {
         ///////////////////////////////////////////////////////////////////////////////////////
         // TODO: This should just happen in UIWindow.mm and should get deleted from here
         int value = [(NSNumber*)newValue intValue];
-        SetZIndex(value);
+        _SetZIndex(value);
         ///////////////////////////////////////////////////////////////////////////////////////
     } else if (strcmp(name, "gravity") == 0) {
-        SetPropertyInt(L"gravity", [(NSNumber*)newValue intValue]);
+        _SetPropertyInt("gravity", [(NSNumber*)newValue intValue]);
     } else if (strcmp(name, "backgroundColor") == 0) {
         const __CGColorQuad* color = [(UIColor*)newValue _getColors];
         if (color) {
-            SetBackgroundColor(color->r, color->g, color->b, color->a);
+            _SetBackgroundColor(color->r, color->g, color->b, color->a);
         } else {
-            SetBackgroundColor(0.0f, 0.0f, 0.0f, 0.0f);
+            _SetBackgroundColor(0.0f, 0.0f, 0.0f, 0.0f);
         }
     } else {
         FAIL_FAST_HR(E_NOTIMPL);

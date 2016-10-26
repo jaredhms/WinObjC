@@ -17,11 +17,15 @@
 // clang-format off
 
 #include "LayerAnimation.h"
+
+#include "DisplayProperties.h"
 #include "LayerProxy.h"
+#include "LayerCoordinator.h"
 #include "StoryboardManager.h"
 
 #include <ErrorHandling.h>
 
+using namespace CoreAnimation;
 using namespace Microsoft::WRL;
 using namespace UIKit::Private::CoreAnimation;
 using namespace Windows::Foundation;
@@ -29,11 +33,12 @@ using namespace Windows::Storage::Streams;
 using namespace Windows::UI::Xaml;
 using namespace Windows::UI::Xaml::Controls;
 using namespace Windows::UI::Xaml::Media;
+using namespace Windows::UI::Xaml::Media::Imaging;
 
 static const wchar_t* TAG = L"LayerAnimation";
 
-__inline CoreAnimation::EventedStoryboard^ _GetStoryboard(const Microsoft::WRL::ComPtr<IInspectable>& xamlAnimation) {
-    return dynamic_cast<CoreAnimation::EventedStoryboard^>(reinterpret_cast<Platform::Object^>(xamlAnimation.Get()));
+__inline CoreAnimation::StoryboardManager^ _GetStoryboardManager(const Microsoft::WRL::ComPtr<IInspectable>& storyboardManager) {
+    return dynamic_cast<CoreAnimation::StoryboardManager^>(reinterpret_cast<Platform::Object^>(storyboardManager.Get()));
 }
 
 __inline FrameworkElement^ _GetXamlElement(ILayerProxy& layer) {
@@ -45,80 +50,133 @@ LayerAnimation::LayerAnimation() {
 }
 
 void LayerAnimation::_CreateXamlAnimation() {
-    auto xamlAnimation = ref new CoreAnimation::EventedStoryboard(
+    auto storyboardManager = ref new CoreAnimation::StoryboardManager(
         beginTime, duration, autoReverse, repeatCount, repeatDuration, speed, timeOffset);
 
     switch (easingFunction) {
         case Easing::EaseInEaseOut: {
             auto easing = ref new Media::Animation::QuadraticEase();
             easing->EasingMode = Media::Animation::EasingMode::EaseInOut;
-            xamlAnimation->AnimationEase = easing;
+            storyboardManager->AnimationEase = easing;
         } break;
 
         case Easing::EaseIn: {
             auto easing = ref new Media::Animation::QuadraticEase();
             easing->EasingMode = Media::Animation::EasingMode::EaseIn;
-            xamlAnimation->AnimationEase = easing;
+            storyboardManager->AnimationEase = easing;
         } break;
 
         case Easing::EaseOut: {
             auto easing = ref new Media::Animation::QuadraticEase();
             easing->EasingMode = Media::Animation::EasingMode::EaseOut;
-            xamlAnimation->AnimationEase = easing;
+            storyboardManager->AnimationEase = easing;
         } break;
 
         case Easing::Default: {
             auto easing = ref new Media::Animation::QuadraticEase();
             easing->EasingMode = Media::Animation::EasingMode::EaseInOut;
-            xamlAnimation->AnimationEase = easing;
+            storyboardManager->AnimationEase = easing;
         } break;
 
         case Easing::Linear: {
-            xamlAnimation->AnimationEase = nullptr;
+            storyboardManager->AnimationEase = nullptr;
         } break;
     }
 
-    _xamlAnimation = reinterpret_cast<IInspectable*>(xamlAnimation);
+    _storyboardManager = reinterpret_cast<IInspectable*>(storyboardManager);
 }
 
 void LayerAnimation::_Start() {
-    CoreAnimation::EventedStoryboard^ xamlAnimation = _GetStoryboard(_xamlAnimation);
+    CoreAnimation::StoryboardManager^ storyboardManager = _GetStoryboardManager(_storyboardManager);
 
     std::weak_ptr<LayerAnimation> weakThis = shared_from_this();
-    xamlAnimation->Completed = ref new CoreAnimation::AnimationMethod([weakThis](Platform::Object^ sender) {
+    storyboardManager->Completed = ref new CoreAnimation::AnimationMethod([weakThis](Platform::Object^ sender) {
         std::shared_ptr<LayerAnimation> strongThis = weakThis.lock();
         if (strongThis) {
             strongThis->_Completed();
-            CoreAnimation::EventedStoryboard^ xamlAnimation = _GetStoryboard(strongThis->_xamlAnimation);
-            xamlAnimation->Completed = nullptr;
+            CoreAnimation::StoryboardManager^ storyboardManager = _GetStoryboardManager(strongThis->_storyboardManager);
+            storyboardManager->Completed = nullptr;
         }
     });
 
-    xamlAnimation->Start();
+    storyboardManager->Start();
 }
 
 void LayerAnimation::Stop() {
-    CoreAnimation::EventedStoryboard^ xamlAnimation = _GetStoryboard(_xamlAnimation);
-    xamlAnimation->Stop();
-    xamlAnimation->Completed = nullptr;
-    _xamlAnimation = nullptr;
+    CoreAnimation::StoryboardManager^ storyboardManager = _GetStoryboardManager(_storyboardManager);
+    storyboardManager->Stop();
+    storyboardManager->Completed = nullptr;
+    _storyboardManager = nullptr;
 }
 
-concurrency::task<void> LayerAnimation::_AddAnimation(ILayerProxy& layer, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to) {
+concurrency::task<void> LayerAnimation::_AddAnimation(ILayerProxy& layer, const char* propertyName, bool fromValid, float from, bool toValid, float to) {
     auto xamlLayer = _GetXamlElement(layer);
-    auto xamlAnimation = _GetStoryboard(_xamlAnimation);
+    auto storyboardManager = _GetStoryboardManager(_storyboardManager);
 
-    xamlAnimation->Animate(xamlLayer,
-        ref new Platform::String(propertyName),
+    storyboardManager->Animate(xamlLayer,
+        propertyName,
         fromValid ? (Platform::Object^)(double)from : nullptr,
         toValid ? (Platform::Object^)(double)to : nullptr);
 
     return concurrency::task_from_result();
 }
 
+concurrency::task<Layer^> _SnapshotLayer(Layer^ layer) {
+    if (((layer->Height == 0) && (layer->Width == 0)) || (layer->Opacity == 0)) {
+        return concurrency::task_from_result<Layer^>(nullptr);
+    }
+    else {
+        RenderTargetBitmap^ snapshot = ref new RenderTargetBitmap();
+        return concurrency::create_task(
+                snapshot->RenderAsync(layer, static_cast<int>(LayerCoordinator::GetVisualWidth(layer) * DisplayProperties::RawScreenScale()), 0))
+            .then([snapshot, layer](concurrency::task<void> result) noexcept {
+            try {
+                result.get();
+            } catch (Platform::InvalidArgumentException^ ex) {
+                // Handle exceptions related to invalid layer attribute passed to RenderAsync
+                TraceWarning(TAG,
+                             L"RenderAsync threw InvalidArgumentException exception - [%ld]%s",
+                             ex->HResult,
+                             ex->Message);
+                return static_cast<Layer^>(nullptr);
+            }
+
+            // Return a new 'copy' layer with the rendered content
+            Layer^ newLayer = ref new Layer();
+            LayerCoordinator::InitializeFrameworkElement(newLayer);
+
+            // Copy display properties from the old layer to the new layer
+            LayerCoordinator::SetValue(newLayer, "opacity", LayerCoordinator::GetValue(layer, "opacity"));
+            LayerCoordinator::SetValue(newLayer, "position", LayerCoordinator::GetValue(layer, "position"));
+            LayerCoordinator::SetValue(newLayer, "size", LayerCoordinator::GetValue(layer, "size"));
+            LayerCoordinator::SetValue(newLayer, "anchorPoint", LayerCoordinator::GetValue(layer, "anchorPoint"));
+
+            int width = snapshot->PixelWidth;
+            int height = snapshot->PixelHeight;
+            auto dispInfo = Windows::Graphics::Display::DisplayInformation::GetForCurrentView();
+
+            // Set the snapshot as the content of the new layer
+            LayerCoordinator::SetContent(
+                newLayer, 
+                snapshot,
+                static_cast<float>(width),
+                static_cast<float>(height), 
+                static_cast<float>(DisplayProperties::RawScreenScale() * dispInfo->RawPixelsPerViewPixel));
+
+            // There seems to be a bug in Xaml where Render'd layers get sized to their visible content... sort of.
+            // If the UIViewController being transitioned away from has transparent content, the height returned is less the
+            // navigation bar, as though Xaml sizes the buffer to the largest child Visual, and only expands where needed.
+            // Top/bottom switched due to geometric origin of CALayer so read this as UIViewContentModeTopLeft
+            LayerCoordinator::SetContentGravity(newLayer, ContentGravity::BottomLeft);
+
+            return newLayer;
+        }, concurrency::task_continuation_context::use_current());
+    }
+}
+
 concurrency::task<void> LayerAnimation::_AddTransitionAnimation(ILayerProxy& layer, const char* type, const char* subtype) {
     auto xamlLayer = _GetXamlElement(layer);
-    auto xamlAnimation = _GetStoryboard(_xamlAnimation);
+    auto storyboardManager = _GetStoryboardManager(_storyboardManager);
 
     std::string stype(type);
     std::wstring wtype(stype.begin(), stype.end());
@@ -135,10 +193,10 @@ concurrency::task<void> LayerAnimation::_AddTransitionAnimation(ILayerProxy& lay
     }
 
     // Render a layer snapshot, then kick off the animation
-    return xamlAnimation->SnapshotLayer(coreAnimationLayer)
-        .then([this, xamlAnimation, coreAnimationLayer, wtype, wsubtype](Layer^ snapshotLayer) noexcept {
+    return _SnapshotLayer(coreAnimationLayer)
+        .then([this, storyboardManager, coreAnimationLayer, wtype, wsubtype](Layer^ snapshotLayer) noexcept {
 
-        xamlAnimation->AddTransition(
+        storyboardManager->AddTransition(
             coreAnimationLayer,
             snapshotLayer,
             ref new Platform::String(wtype.data()),

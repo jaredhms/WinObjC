@@ -22,6 +22,7 @@
 #include <ErrorHandling.h>
 
 #include <algorithm>
+#include <functional>
 #include <map>
 
 using namespace Platform;
@@ -44,111 +45,110 @@ static const bool DEBUG_SIZE = DEBUG_ALL || false;
 namespace CoreAnimation {
 
 // Provides support for setting, animating and retrieving values.
-delegate void ApplyAnimationFunction(FrameworkElement^ target,
-    Storyboard^ storyboard,
-    DoubleAnimation^ properties,
-    Object^ fromValue,
-    Object^ toValue);
-delegate void ApplyTransformFunction(FrameworkElement^ target, Object^ toValue);
-delegate Object^ GetCurrentValueFunction(FrameworkElement^ target);
+using ApplyAnimationFunction = std::function<void(FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ fromValue, Object^ toValue)>;
+using ApplyTransformFunction = std::function<void (FrameworkElement^ target, Object^ toValue)>;
+using GetCurrentValueFunction = std::function<Object^ (FrameworkElement^ target)>;
 
 /////////////////////////////////////////////////////////
 // TODO: SWITCH TO STD::FUNCTIONS
 /////////////////////////////////////////////////////////
-ref class AnimatableProperty sealed {
+struct AnimatableProperty {
 public:
-    property ApplyAnimationFunction^ AnimateValue;
-    property ApplyTransformFunction^ SetValue;
-    property GetCurrentValueFunction^ GetValue;
+    ApplyAnimationFunction AnimateValue;
+    ApplyTransformFunction SetValue;
+    GetCurrentValueFunction GetValue;
 
-    AnimatableProperty(ApplyAnimationFunction^ animate, ApplyTransformFunction^ set, GetCurrentValueFunction^ get) {
+    AnimatableProperty(const ApplyAnimationFunction& animate, const ApplyTransformFunction& set, const GetCurrentValueFunction& get) {
         AnimateValue = animate;
         SetValue = set;
         GetValue = get;
     };
+
+    AnimatableProperty() {
+    }
 };
 
-std::map<String^, AnimatableProperty^> s_animatableProperties = {
+std::map<std::string, AnimatableProperty> s_animatableProperties = {
     { "position.x",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
               // Animate the PositionTransform
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetPositionXTransformPath(),
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetPositionXTransformPath(),
                   target,
                   storyboard,
                   properties,
                   from,
                   to);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
               auto positionX = static_cast<double>(toValue);
 
               // Store PositionX
-              LayerProperties::SetPositionX(target, static_cast<float>(positionX));
+              LayerCoordinator::SetPositionX(target, static_cast<float>(positionX));
 
               // Update the PositionTransform
-              LayerProperties::GetPositionTransform(target)->X = positionX;
+              LayerCoordinator::GetPositionTransform(target)->X = positionX;
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return LayerProperties::GetPositionTransform(target)->X;
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerCoordinator::GetPositionTransform(target)->X;
           })) },
     { "position.y",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
               // Animate the PositionTransform
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetPositionYTransformPath(),
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetPositionYTransformPath(),
                   target,
                   storyboard,
                   properties,
                   from,
                   to);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
               auto positionY = static_cast<double>(toValue);
 
               // Store PositionY
-              LayerProperties::SetPositionY(target, static_cast<float>(positionY));
+              LayerCoordinator::SetPositionY(target, static_cast<float>(positionY));
 
               // Update the PositionTransform
-              LayerProperties::GetPositionTransform(target)->Y = positionY;
+              LayerCoordinator::GetPositionTransform(target)->Y = positionY;
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return LayerProperties::GetPositionTransform(target)->Y;
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerCoordinator::GetPositionTransform(target)->Y;
           })) },
     { "position",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-              s_animatableProperties["position.x"]->AnimateValue(target,
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              s_animatableProperties["position.x"].AnimateValue(target,
                                                             storyboard,
                                                             properties,
                                                             from ? (Object^)((Point)from).X : nullptr,
                                                             (double)((Point)to).X);
-              s_animatableProperties["position.y"]->AnimateValue(target,
+              s_animatableProperties["position.y"].AnimateValue(target,
                                                             storyboard,
                                                             properties,
                                                             from ? (Object^)((Point)from).Y : nullptr,
                                                             (double)((Point)to).Y);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
-              s_animatableProperties["position.x"]->SetValue(target, (double)((Point)toValue).X);
-              s_animatableProperties["position.y"]->SetValue(target, (double)((Point)toValue).Y);
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              s_animatableProperties["position.x"].SetValue(target, (double)((Point)toValue).X);
+              s_animatableProperties["position.y"].SetValue(target, (double)((Point)toValue).Y);
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
               // Unbox x and y values as doubles, before casting them to floats
-              return Point((float)(double)LayerProperties::GetValue(target, "position.x"),
-                           (float)(double)LayerProperties::GetValue(target, "position.y"));
+              return Point((float)(double)LayerCoordinator::GetValue(target, "position.x"),
+                           (float)(double)LayerCoordinator::GetValue(target, "position.y"));
           })) },
     { "origin.x",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
               // Zero out negative and null values
               auto fromValue = from ? std::max<double>(0.0, static_cast<double>(from)) : 0.0;
               auto toValue = to ? std::max<double>(0.0, static_cast<double>(to)) : 0.0;
 
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetOriginXTransformPath(),
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetOriginXTransformPath(),
                   target,
                   storyboard,
                   properties,
@@ -157,7 +157,7 @@ std::map<String^, AnimatableProperty^> s_animatableProperties = {
 
               // Animate the Clip transform
               if (target->Clip) {
-                  LayerProperties::AddAnimation(
+                  LayerCoordinator::AddAnimation(
                       "(UIElement.Clip).(Transform).(TranslateTransform.X)",
                       target,
                       storyboard,
@@ -166,32 +166,32 @@ std::map<String^, AnimatableProperty^> s_animatableProperties = {
                       toValue);
               }
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
               auto targetValue = static_cast<double>(toValue);
 
               // Store the new OriginX value
-              LayerProperties::SetOriginX(target, static_cast<float>(targetValue));
+              LayerCoordinator::SetOriginX(target, static_cast<float>(targetValue));
 
               // Update the OriginTransform
-              LayerProperties::GetOriginTransform(target)->X = -targetValue;
+              LayerCoordinator::GetOriginTransform(target)->X = -targetValue;
 
               // Update the Clip transform
               if (target->Clip) {
                   ((TranslateTransform^)target->Clip->Transform)->X = targetValue;
               }
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return -(LayerProperties::GetOriginTransform(target)->X);
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return -(LayerCoordinator::GetOriginTransform(target)->X);
           })) },
     { "origin.y",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
               // Zero out negative and null values
               auto fromValue = from ? std::max<double>(0.0, static_cast<double>(from)) : 0.0;
               auto toValue = to ? std::max<double>(0.0, static_cast<double>(to)) : 0.0;
 
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetOriginYTransformPath(),
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetOriginYTransformPath(),
                   target,
                   storyboard,
                   properties,
@@ -200,7 +200,7 @@ std::map<String^, AnimatableProperty^> s_animatableProperties = {
 
               // Animate the Clip transform
               if (target->Clip) {
-                  LayerProperties::AddAnimation(
+                  LayerCoordinator::AddAnimation(
                       "(UIElement.Clip).(Transform).(TranslateTransform.Y)",
                       target,
                       storyboard,
@@ -209,49 +209,49 @@ std::map<String^, AnimatableProperty^> s_animatableProperties = {
                       toValue);
               }
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
               auto targetValue = static_cast<double>(toValue);
 
               // Store the new OriginY value
-              LayerProperties::SetOriginY(target, static_cast<float>(targetValue));
+              LayerCoordinator::SetOriginY(target, static_cast<float>(targetValue));
 
               // Update the OriginTransform
-              LayerProperties::GetOriginTransform(target)->Y = -targetValue;
+              LayerCoordinator::GetOriginTransform(target)->Y = -targetValue;
 
               // Update the Clip transform
               if (target->Clip) {
                   ((TranslateTransform^)target->Clip->Transform)->Y = targetValue;
               }
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return -(LayerProperties::GetOriginTransform(target)->Y);
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return -(LayerCoordinator::GetOriginTransform(target)->Y);
           })) },
     { "origin",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-              s_animatableProperties["origin.x"]->AnimateValue(target,
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              s_animatableProperties["origin.x"].AnimateValue(target,
                                                           storyboard,
                                                           properties,
                                                           (from != nullptr) ? (Object^)((Point)from).X : nullptr,
                                                           (double)((Point)to).X);
-              s_animatableProperties["origin.y"]->AnimateValue(target,
+              s_animatableProperties["origin.y"].AnimateValue(target,
                                                           storyboard,
                                                           properties,
                                                           (from != nullptr) ? (Object^)((Point)from).Y : nullptr,
                                                           (double)((Point)to).Y);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
-              s_animatableProperties["origin.x"]->SetValue(target, (double)((Point)toValue).X);
-              s_animatableProperties["origin.y"]->SetValue(target, (double)((Point)toValue).Y);
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              s_animatableProperties["origin.x"].SetValue(target, (double)((Point)toValue).X);
+              s_animatableProperties["origin.y"].SetValue(target, (double)((Point)toValue).Y);
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
               // Unbox x and y values as doubles, before casting them to floats
-              return Point((float)(double)LayerProperties::GetValue(target, "origin.x"),
-                           (float)(double)LayerProperties::GetValue(target, "origin.y"));
+              return Point((float)(double)LayerCoordinator::GetValue(target, "origin.x"),
+                           (float)(double)LayerCoordinator::GetValue(target, "origin.y"));
           })) },
     { "anchorPoint.x",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
               // Zero out negative and null values
               auto fromValue = from ? std::max<double>(0.0, static_cast<double>(from)) : 0.0;
               auto toValue = to ? std::max<double>(0.0, static_cast<double>(to)) : 0.0;
@@ -259,29 +259,29 @@ std::map<String^, AnimatableProperty^> s_animatableProperties = {
               // Calculate values to animate on the AnchorPoint transform
               fromValue = -target->Width * fromValue;
               toValue = -target->Width * toValue;
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetAnchorXTransformPath(),
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetAnchorXTransformPath(),
                   target,
                   storyboard,
                   properties,
                   from ? static_cast<Object^>(fromValue) : nullptr,
                   toValue);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
               // Store the new anchorPointX value
               auto anchorPointX = static_cast<double>(toValue);
-              LayerProperties::SetAnchorPointX(target, static_cast<float>(anchorPointX));
+              LayerCoordinator::SetAnchorPointX(target, static_cast<float>(anchorPointX));
 
               // Calculate and update the AnchorPoint transform
               double destX = -target->Width * anchorPointX;
-              LayerProperties::GetAnchorTransform(target)->X = destX;
+              LayerCoordinator::GetAnchorTransform(target)->X = destX;
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return static_cast<double>(LayerProperties::GetAnchorPointX(target));
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return static_cast<double>(LayerCoordinator::GetAnchorPointX(target));
           })) },
     { "anchorPoint.y",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
               // Zero out negative and null values
               auto fromValue = from ? std::max<double>(0.0, static_cast<double>(from)) : 0.0;
               auto toValue = to ? std::max<double>(0.0, static_cast<double>(to)) : 0.0;
@@ -289,63 +289,63 @@ std::map<String^, AnimatableProperty^> s_animatableProperties = {
               // Calculate values to animate on the AnchorPoint transform
               fromValue = -target->Height * fromValue;
               toValue = -target->Height * toValue;
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetAnchorYTransformPath(),
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetAnchorYTransformPath(),
                   target,
                   storyboard,
                   properties,
                   from ? static_cast<Object^>(fromValue) : nullptr,
                   toValue);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
               // Store the new anchorPointY value
               auto anchorPointY = static_cast<double>(toValue);
-              LayerProperties::SetAnchorPointY(target, static_cast<float>(anchorPointY));
+              LayerCoordinator::SetAnchorPointY(target, static_cast<float>(anchorPointY));
 
               // Calculate and update the AnchorPoint transform
               double destY = -target->Height * anchorPointY;
-              LayerProperties::GetAnchorTransform(target)->Y = destY;
+              LayerCoordinator::GetAnchorTransform(target)->Y = destY;
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return static_cast<double>(LayerProperties::GetAnchorPointY(target));
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return static_cast<double>(LayerCoordinator::GetAnchorPointY(target));
           })) },
     { "anchorPoint",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-              s_animatableProperties["anchorPoint.x"]->AnimateValue(target,
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              s_animatableProperties["anchorPoint.x"].AnimateValue(target,
                                                                storyboard,
                                                                properties,
                                                                (from != nullptr) ? (Object^)((Point)from).X : nullptr,
                                                                (double)((Point)to).X);
-              s_animatableProperties["anchorPoint.y"]->AnimateValue(target,
+              s_animatableProperties["anchorPoint.y"].AnimateValue(target,
                                                                storyboard,
                                                                properties,
                                                                (from != nullptr) ? (Object^)((Point)from).Y : nullptr,
                                                                (double)((Point)to).Y);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
-              LayerProperties::SetValue(target, "anchorPoint.x", static_cast<double>(static_cast<Point>(toValue).X));
-              LayerProperties::SetValue(target, "anchorPoint.y", static_cast<double>(static_cast<Point>(toValue).Y));
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerCoordinator::SetValue(target, "anchorPoint.x", static_cast<double>(static_cast<Point>(toValue).X));
+              LayerCoordinator::SetValue(target, "anchorPoint.y", static_cast<double>(static_cast<Point>(toValue).Y));
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
               // Unbox x and y values as doubles, before casting them to floats
-              return Point(static_cast<float>(static_cast<double>(LayerProperties::GetValue(target, "anchorPoint.x"))),
-                           static_cast<float>(static_cast<double>(LayerProperties::GetValue(target, "anchorPoint.y"))));
+              return Point(static_cast<float>(static_cast<double>(LayerCoordinator::GetValue(target, "anchorPoint.x"))),
+                           static_cast<float>(static_cast<double>(LayerCoordinator::GetValue(target, "anchorPoint.y"))));
           })) },
     { "size.width",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
               // Zero out negative and null values
               auto fromValue = from ? std::max<double>(0.0, static_cast<double>(from)) : 0.0;
               auto toValue = to ? std::max<double>(0.0, static_cast<double>(to)) : 0.0;
 
               // Calculate values to animate on the AnchorPoint transform
               // TODO: SHOULD WE JUST ANIMATE THEM DIRECTLY RATHER THAN DUPLICATING THIS LOGIC, OR PULL OUT TO SHARED LOCATION?
-              float anchorPointX = LayerProperties::GetAnchorPointX(target);
+              float anchorPointX = LayerCoordinator::GetAnchorPointX(target);
               fromValue = (-(fromValue) * anchorPointX);
               toValue = (-(toValue) * anchorPointX);
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetAnchorXTransformPath(),
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetAnchorXTransformPath(),
                   target,
                   storyboard,
                   properties,
@@ -355,25 +355,25 @@ std::map<String^, AnimatableProperty^> s_animatableProperties = {
               ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
               // Animate the VisualWidth property to the new value
               // TODO: Why is this necessary - is it only necessary to re-render every frame?
-              LayerProperties::AddAnimation("(LayerProperties.VisualWidth)", target, storyboard, properties, from, to, true);
+              LayerCoordinator::AddAnimation("(LayerCoordinator.VisualWidth)", target, storyboard, properties, from, to, true);
               ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
               // Update our width
               auto toWidth = std::max<double>(0.0, static_cast<double>(toValue));
               target->Width = toWidth;
 
               // Update the AnchorPoint transform
-              double destX = -(toWidth) * LayerProperties::GetAnchorPointX(target);
-              LayerProperties::GetAnchorTransform(target)->X = destX;
+              double destX = -(toWidth) * LayerCoordinator::GetAnchorPointX(target);
+              LayerCoordinator::GetAnchorTransform(target)->X = destX;
 
-              auto anchorX = LayerProperties::GetAnchorTransform(target)->X;
-              auto anchorY = LayerProperties::GetAnchorTransform(target)->Y;
+              auto anchorX = LayerCoordinator::GetAnchorTransform(target)->X;
+              auto anchorY = LayerCoordinator::GetAnchorTransform(target)->Y;
 
               ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
               // Update the VisualWidth property
               // TODO: Why is this necessary - is it only necessary to re-render every frame?
-              LayerProperties::SetVisualWidth(target, toWidth);
+              LayerCoordinator::SetVisualWidth(target, toWidth);
               ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
               // Update the Clip rect if necessary
@@ -383,23 +383,23 @@ std::map<String^, AnimatableProperty^> s_animatableProperties = {
                   target->Clip->Rect = clipRect;
               }
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return LayerProperties::GetVisualWidth(target);
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerCoordinator::GetVisualWidth(target);
           })) },
     { "size.height",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
               // Zero out negative and null values
               auto fromValue = from ? std::max<double>(0.0, static_cast<double>(from)) : 0.0;
               auto toValue = to ? std::max<double>(0.0, static_cast<double>(to)) : 0.0;
 
               // Calculate values to animate on the AnchorPoint transform
               // TODO: SHOULD WE JUST ANIMATE THEM DIRECTLY RATHER THAN DUPLICATING THIS LOGIC, OR PULL OUT TO SHARED LOCATION?
-              float anchorPointY = LayerProperties::GetAnchorPointY(target);
+              float anchorPointY = LayerCoordinator::GetAnchorPointY(target);
               fromValue = (-(fromValue) * anchorPointY);
               toValue = (-(toValue) * anchorPointY);
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetAnchorYTransformPath(),
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetAnchorYTransformPath(),
                   target,
                   storyboard,
                   properties,
@@ -409,22 +409,22 @@ std::map<String^, AnimatableProperty^> s_animatableProperties = {
               //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
               // Animate the VisualHeight property to the new value
               // TODO: Why is this necessary - is it only necessary to re-render every frame?
-              LayerProperties::AddAnimation("(LayerProperties.VisualHeight)", target, storyboard, properties, from, to, true);
+              LayerCoordinator::AddAnimation("(LayerCoordinator.VisualHeight)", target, storyboard, properties, from, to, true);
               //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
               // Update our height
               auto toHeight = std::max<double>(0.0, static_cast<double>(toValue));
               target->Height = toHeight;
 
               // Update the AnchorPoint transform
-              double destY = -(toHeight) * LayerProperties::GetAnchorPointY(target);
-              LayerProperties::GetAnchorTransform(target)->Y = destY;
+              double destY = -(toHeight) * LayerCoordinator::GetAnchorPointY(target);
+              LayerCoordinator::GetAnchorTransform(target)->Y = destY;
 
               //////////////////////////////////////////////////////////////////////////////////
               // Update the VisualHeight property
               // TODO: Why is this necessary - is it only necessary to re-render every frame?
-              LayerProperties::SetVisualHeight(target, toHeight);
+              LayerCoordinator::SetVisualHeight(target, toHeight);
               //////////////////////////////////////////////////////////////////////////////////
 
               // Update the Clip rect if necessary
@@ -434,140 +434,141 @@ std::map<String^, AnimatableProperty^> s_animatableProperties = {
                   target->Clip->Rect = clipRect;
               }
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return LayerProperties::GetVisualHeight(target);
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerCoordinator::GetVisualHeight(target);
           })) },
     { "size",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-              s_animatableProperties["size.width"]->AnimateValue(target,
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              s_animatableProperties["size.width"].AnimateValue(target,
                                                             storyboard,
                                                             properties,
                                                             (from != nullptr) ? (Object^)((Size)from).Width : nullptr,
                                                             (double)((Size)to).Width);
-              s_animatableProperties["size.height"]->AnimateValue(target,
+              s_animatableProperties["size.height"].AnimateValue(target,
                                                              storyboard,
                                                              properties,
                                                              (from != nullptr) ? (Object^)((Size)from).Height : nullptr,
                                                              (double)((Size)to).Height);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
-              s_animatableProperties["size.width"]->SetValue(target, (double)((Size)toValue).Width);
-              s_animatableProperties["size.height"]->SetValue(target, (double)((Size)toValue).Height);
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              s_animatableProperties["size.width"].SetValue(target, (double)((Size)toValue).Width);
+              s_animatableProperties["size.height"].SetValue(target, (double)((Size)toValue).Height);
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
               // Unbox width and height values as doubles, before casting them to floats
-              return Size((float)(double)LayerProperties::GetValue(target, "size.width"),
-                          (float)(double)LayerProperties::GetValue(target, "size.height"));
+              return Size((float)(double)LayerCoordinator::GetValue(target, "size.width"),
+                          (float)(double)LayerCoordinator::GetValue(target, "size.height"));
           })) },
     { "transform.rotation",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetRotationTransformPath(),
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetRotationTransformPath(),
                   target,
                   storyboard,
                   properties,
                   from,
                   to);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
-              LayerProperties::GetRotationTransform(target)->Angle = static_cast<double>(toValue);
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerCoordinator::GetRotationTransform(target)->Angle = static_cast<double>(toValue);
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return LayerProperties::GetRotationTransform(target)->Angle;
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerCoordinator::GetRotationTransform(target)->Angle;
           })) },
     { "transform.scale.x",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetScaleXTransformPath(),
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetScaleXTransformPath(),
                   target,
                   storyboard,
                   properties,
                   from,
                   to);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
-              LayerProperties::GetScaleTransform(target)->ScaleX = static_cast<double>(toValue);
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerCoordinator::GetScaleTransform(target)->ScaleX = static_cast<double>(toValue);
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return LayerProperties::GetScaleTransform(target)->ScaleX;
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerCoordinator::GetScaleTransform(target)->ScaleX;
           })) },
     { "transform.scale.y",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetScaleYTransformPath(),
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetScaleYTransformPath(),
                   target,
                   storyboard,
                   properties,
                   from,
                   to);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
-              LayerProperties::GetScaleTransform(target)->ScaleY = static_cast<double>(toValue);
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerCoordinator::GetScaleTransform(target)->ScaleY = static_cast<double>(toValue);
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return LayerProperties::GetScaleTransform(target)->ScaleY;
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerCoordinator::GetScaleTransform(target)->ScaleY;
           })) },
     { "transform.translation.x",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetTranslationXTransformPath(),
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetTranslationXTransformPath(),
                   target,
                   storyboard,
                   properties,
                   from,
                   to);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
-              LayerProperties::GetTranslationTransform(target)->X = static_cast<double>(toValue);
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerCoordinator::GetTranslationTransform(target)->X = static_cast<double>(toValue);
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return LayerProperties::GetTranslationTransform(target)->X;
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerCoordinator::GetTranslationTransform(target)->X;
           })) },
     { "transform.translation.y",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-              LayerProperties::AddAnimation(
-                  LayerProperties::GetTranslationYTransformPath(),
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              LayerCoordinator::AddAnimation(
+                  LayerCoordinator::GetTranslationYTransformPath(),
                   target,
                   storyboard,
                   properties,
                   from,
                   to);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
-              LayerProperties::GetTranslationTransform(target)->Y = static_cast<double>(toValue);
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerCoordinator::GetTranslationTransform(target)->Y = static_cast<double>(toValue);
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
-              return LayerProperties::GetTranslationTransform(target)->Y;
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ {
+              return LayerCoordinator::GetTranslationTransform(target)->Y;
           })) },
     { "opacity",
-      ref new AnimatableProperty(
-          ref new ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
-              LayerProperties::AddAnimation("(UIElement.Opacity)", target, storyboard, properties, from, to);
+      AnimatableProperty(
+          ApplyAnimationFunction([](FrameworkElement^ target, Storyboard^ storyboard, DoubleAnimation^ properties, Object^ from, Object^ to) {
+              LayerCoordinator::AddAnimation("(UIElement.Opacity)", target, storyboard, properties, from, to);
           }),
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
               target->Opacity = static_cast<double>(toValue);
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ { 
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ { 
               return target->Opacity; 
           })) },
     { "gravity",
-      ref new AnimatableProperty(
-          nullptr,
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
-              LayerProperties::SetContentGravity(target, static_cast<ContentGravity>(static_cast<int>(toValue)));
+      AnimatableProperty(
+          ApplyAnimationFunction(), // No animation supported
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+              LayerCoordinator::SetContentGravity(target, static_cast<ContentGravity>(static_cast<int>(toValue)));
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ { 
-              return static_cast<int>(LayerProperties::GetContentGravity(target));
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ { 
+              return static_cast<int>(LayerCoordinator::GetContentGravity(target));
           })) },
     { "masksToBounds",
-      ref new AnimatableProperty(nullptr,
-          ref new ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
+      AnimatableProperty(
+          ApplyAnimationFunction(), // No animation supported
+          ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
               bool masksToBounds = static_cast<bool>(toValue);
               if (masksToBounds) {
                   // Set up our Clip geometry based on the visual/transformed width/height of the target
@@ -576,13 +577,13 @@ std::map<String^, AnimatableProperty^> s_animatableProperties = {
                   clipGeometry->Rect = Rect(
                       0, 
                       0, 
-                      static_cast<float>(LayerProperties::GetVisualWidth(target)), 
-                      static_cast<float>(LayerProperties::GetVisualHeight(target)));
+                      static_cast<float>(LayerCoordinator::GetVisualWidth(target)), 
+                      static_cast<float>(LayerCoordinator::GetVisualHeight(target)));
 
                   // Set up its origin transform
                   auto clipOriginTransform = ref new TranslateTransform();
-                  clipOriginTransform->X = LayerProperties::GetOriginX(target);
-                  clipOriginTransform->Y = LayerProperties::GetOriginY(target);
+                  clipOriginTransform->X = LayerCoordinator::GetOriginX(target);
+                  clipOriginTransform->Y = LayerCoordinator::GetOriginY(target);
                   clipGeometry->Transform = clipOriginTransform;
 
                   target->Clip = clipGeometry;
@@ -591,25 +592,25 @@ std::map<String^, AnimatableProperty^> s_animatableProperties = {
                   target->Clip = nullptr;
               }
           }),
-          ref new GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ { 
+          GetCurrentValueFunction([](FrameworkElement^ target) -> Object^ { 
               return target->Clip != nullptr; 
           })) },
 };
 
 // CALayer property management plumbing
-bool LayerProperties::s_dependencyPropertiesRegistered = false;
-DependencyProperty^ LayerProperties::s_anchorPointProperty = nullptr;
-DependencyProperty^ LayerProperties::s_originProperty = nullptr;
-DependencyProperty^ LayerProperties::s_positionProperty = nullptr;
-DependencyProperty^ LayerProperties::s_visualWidthProperty = nullptr;
-DependencyProperty^ LayerProperties::s_visualHeightProperty = nullptr;
-DependencyProperty^ LayerProperties::s_contentGravityProperty = nullptr;
-DependencyProperty^ LayerProperties::s_contentCenterProperty = nullptr;
-DependencyProperty^ LayerProperties::s_contentSizeProperty = nullptr;
+bool LayerCoordinator::s_dependencyPropertiesRegistered = false;
+DependencyProperty^ LayerCoordinator::s_anchorPointProperty = nullptr;
+DependencyProperty^ LayerCoordinator::s_originProperty = nullptr;
+DependencyProperty^ LayerCoordinator::s_positionProperty = nullptr;
+DependencyProperty^ LayerCoordinator::s_visualWidthProperty = nullptr;
+DependencyProperty^ LayerCoordinator::s_visualHeightProperty = nullptr;
+DependencyProperty^ LayerCoordinator::s_contentGravityProperty = nullptr;
+DependencyProperty^ LayerCoordinator::s_contentCenterProperty = nullptr;
+DependencyProperty^ LayerCoordinator::s_contentSizeProperty = nullptr;
 
-void LayerProperties::InitializeFrameworkElement(FrameworkElement^ element) {
+void LayerCoordinator::InitializeFrameworkElement(FrameworkElement^ element) {
     // No-op if already registered
-    _registerDependencyProperties();
+    _RegisterDependencyProperties();
 
     // Make sure this FrameworkElement is hit-testable by default
     element->IsHitTestVisible = true;
@@ -658,26 +659,26 @@ void LayerProperties::InitializeFrameworkElement(FrameworkElement^ element) {
 }
 
 // CALayer property managment support
-void LayerProperties::SetValue(FrameworkElement^ element, String^ propertyName, Object^ value) {
-    s_animatableProperties[propertyName]->SetValue(element, value);
+void LayerCoordinator::SetValue(FrameworkElement^ element, const char* propertyName, Object^ value) {
+    s_animatableProperties[propertyName].SetValue(element, value);
 }
 
-Object^ LayerProperties::GetValue(FrameworkElement^ element, String^ propertyName) {
-    return s_animatableProperties[propertyName]->GetValue(element);
+Object^ LayerCoordinator::GetValue(FrameworkElement^ element, const char* propertyName) {
+    return s_animatableProperties[propertyName].GetValue(element);
 }
 
-void LayerProperties::AnimateValue(
+void LayerCoordinator::AnimateValue(
     FrameworkElement^ target,
     Storyboard^ storyboard,
     DoubleAnimation^ timeline,
-    String^ propertyName,
+    const char* propertyName,
     Object^ fromValue,
     Object^ toValue) {
-    s_animatableProperties[propertyName]->AnimateValue(target, storyboard, timeline, fromValue, toValue);
+    s_animatableProperties[propertyName].AnimateValue(target, storyboard, timeline, fromValue, toValue);
 }
 
 // CALayer content support
-void LayerProperties::SetContent(FrameworkElement^ element, ImageSource^ source, float width, float height, float scale) {
+void LayerCoordinator::SetContent(FrameworkElement^ element, ImageSource^ source, float width, float height, float scale) {
     // Get content 
     auto contentImage = _GetContentImage(element, true /* createIfPossible */);
     if (!contentImage) {
@@ -700,7 +701,7 @@ void LayerProperties::SetContent(FrameworkElement^ element, ImageSource^ source,
     _ApplyContentGravity(element, GetContentGravity(element));
 }
 
-Image^ LayerProperties::_GetContentImage(FrameworkElement^ element, bool createIfPossible) {
+Image^ LayerCoordinator::_GetContentImage(FrameworkElement^ element, bool createIfPossible) {
     // First check if the element implements ILayer
     Image^ contentImage;
     ILayer^ layerElement = dynamic_cast<ILayer^>(element);
@@ -723,16 +724,16 @@ Image^ LayerProperties::_GetContentImage(FrameworkElement^ element, bool createI
     return contentImage;
 }
 
-void LayerProperties::SetContentCenter(FrameworkElement^ element, Windows::Foundation::Rect rect) {
+void LayerCoordinator::SetContentCenter(FrameworkElement^ element, Windows::Foundation::Rect rect) {
     element->SetValue(s_contentCenterProperty, rect);
     _ApplyContentCenter(element, rect);
 }
 
-Rect LayerProperties::_GetContentCenter(FrameworkElement^ element) {
+Rect LayerCoordinator::_GetContentCenter(FrameworkElement^ element) {
     return static_cast<Rect>(element->GetValue(s_contentCenterProperty));
 }
 
-void LayerProperties::_ApplyContentCenter(FrameworkElement^ element, Rect contentCenter) {
+void LayerCoordinator::_ApplyContentCenter(FrameworkElement^ element, Rect contentCenter) {
     // Nothing to do if we don't have any content
     Image^ image = _GetContentImage(element);
     if (!image || !image->Source ) {
@@ -771,13 +772,7 @@ void LayerProperties::_ApplyContentCenter(FrameworkElement^ element, Rect conten
     }
 }
 
-// CALayer border support
-// TODO: Add border support
-
-///////////////////////////////////////////////////////////////////////////////////
-// TODO: EVERYTHING BELOW SHOULD/CAN PROB GO INTO A .CPP FILE AS A HELPER REF CLASS
-
-void LayerProperties::_registerDependencyProperties() {
+void LayerCoordinator::_RegisterDependencyProperties() {
     if (!s_dependencyPropertiesRegistered) {
 
         // AnchorPoint always starts at Point(0.5, 0.5)
@@ -804,14 +799,14 @@ void LayerProperties::_registerDependencyProperties() {
             double::typeid,
             FrameworkElement::typeid,
             ref new PropertyMetadata(0.0,
-            ref new PropertyChangedCallback(&LayerProperties::_sizeChangedCallback)));
+            ref new PropertyChangedCallback(&LayerCoordinator::_sizeChangedCallback)));
 
         s_visualHeightProperty = DependencyProperty::RegisterAttached(
             "VisualHeight",
             double::typeid,
             FrameworkElement::typeid,
             ref new PropertyMetadata(0.0,
-            ref new PropertyChangedCallback(&LayerProperties::_sizeChangedCallback)));
+            ref new PropertyChangedCallback(&LayerCoordinator::_sizeChangedCallback)));
 
         s_contentGravityProperty = DependencyProperty::RegisterAttached(
             "ContentGravity",
@@ -836,15 +831,15 @@ void LayerProperties::_registerDependencyProperties() {
 }
 
 // AnchorPoint
-DependencyProperty^ LayerProperties::AnchorPointProperty::get() {
+DependencyProperty^ LayerCoordinator::AnchorPointProperty::get() {
     return s_anchorPointProperty;
 }
 
-float LayerProperties::GetAnchorPointX(FrameworkElement^ element) {
+float LayerCoordinator::GetAnchorPointX(FrameworkElement^ element) {
     return static_cast<Point>(element->GetValue(s_anchorPointProperty)).X;
 }
 
-void LayerProperties::SetAnchorPointX(FrameworkElement^ element, float value) {
+void LayerCoordinator::SetAnchorPointX(FrameworkElement^ element, float value) {
     if (DEBUG_ANCHORPOINT) {
         TraceVerbose(TAG, L"SetAnchorPointX [%ws:%f]", element->GetType()->FullName->Data(), value);
     }
@@ -854,11 +849,11 @@ void LayerProperties::SetAnchorPointX(FrameworkElement^ element, float value) {
     element->SetValue(s_anchorPointProperty, point);
 }
 
-float LayerProperties::GetAnchorPointY(FrameworkElement^ element) {
+float LayerCoordinator::GetAnchorPointY(FrameworkElement^ element) {
     return static_cast<Point>(element->GetValue(s_anchorPointProperty)).Y;
 }
 
-void LayerProperties::SetAnchorPointY(FrameworkElement^ element, float value) {
+void LayerCoordinator::SetAnchorPointY(FrameworkElement^ element, float value) {
     if (DEBUG_ANCHORPOINT) {
         TraceVerbose(TAG, L"SetAnchorPointY [%ws:%f]", element->GetType()->FullName->Data(), value);
     }
@@ -868,69 +863,69 @@ void LayerProperties::SetAnchorPointY(FrameworkElement^ element, float value) {
     element->SetValue(s_anchorPointProperty, point);
 }
 
-TranslateTransform^ LayerProperties::GetAnchorTransform(FrameworkElement^ element) {
+TranslateTransform^ LayerCoordinator::GetAnchorTransform(FrameworkElement^ element) {
     return safe_cast<TranslateTransform^>(safe_cast<TransformGroup^>(element->RenderTransform)->Children->GetAt(0));
 }
 
-String^ LayerProperties::GetAnchorXTransformPath() {
+String^ LayerCoordinator::GetAnchorXTransformPath() {
     static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[0].(TranslateTransform.X)";
     return path;
 }
 
-String^ LayerProperties::GetAnchorYTransformPath() {
+String^ LayerCoordinator::GetAnchorYTransformPath() {
     static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[0].(TranslateTransform.Y)";
     return path;
 }
 
 // Origin
-DependencyProperty^ LayerProperties::OriginProperty::get() {
+DependencyProperty^ LayerCoordinator::OriginProperty::get() {
     return s_originProperty;
 }
 
-float LayerProperties::GetOriginX(FrameworkElement^ element) {
+float LayerCoordinator::GetOriginX(FrameworkElement^ element) {
     return static_cast<Point>(element->GetValue(s_originProperty)).X;
 }
 
-void LayerProperties::SetOriginX(FrameworkElement^ element, float value) {
+void LayerCoordinator::SetOriginX(FrameworkElement^ element, float value) {
     auto point = static_cast<Point>(element->GetValue(s_originProperty));
     point.X = value;
     element->SetValue(s_originProperty, point);
 }
 
-float LayerProperties::GetOriginY(FrameworkElement^ element) {
+float LayerCoordinator::GetOriginY(FrameworkElement^ element) {
     return static_cast<Point>(element->GetValue(s_originProperty)).Y;
 }
 
-void LayerProperties::SetOriginY(FrameworkElement^ element, float value) {
+void LayerCoordinator::SetOriginY(FrameworkElement^ element, float value) {
     auto point = static_cast<Point>(element->GetValue(s_originProperty));
     point.Y = value;
     element->SetValue(s_originProperty, point);
 }
 
-TranslateTransform^ LayerProperties::GetOriginTransform(FrameworkElement^ element) {
+TranslateTransform^ LayerCoordinator::GetOriginTransform(FrameworkElement^ element) {
     return safe_cast<TranslateTransform^>(safe_cast<TransformGroup^>(element->RenderTransform)->Children->GetAt(1));
 }
 
-String^ LayerProperties::GetOriginXTransformPath() {
+String^ LayerCoordinator::GetOriginXTransformPath() {
     static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.X)";
     return path;
 }
 
-String^ LayerProperties::GetOriginYTransformPath() {
+String^ LayerCoordinator::GetOriginYTransformPath() {
     static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)";
     return path;
 }
 
 // Position
-DependencyProperty^ LayerProperties::PositionProperty::get() {
+DependencyProperty^ LayerCoordinator::PositionProperty::get() {
     return s_positionProperty;
 }
 
-float LayerProperties::GetPositionX(FrameworkElement^ element) {
+float LayerCoordinator::GetPositionX(FrameworkElement^ element) {
     return static_cast<Point>(element->GetValue(s_positionProperty)).X;
 }
 
-void LayerProperties::SetPositionX(FrameworkElement^ element, float value) {
+void LayerCoordinator::SetPositionX(FrameworkElement^ element, float value) {
     if (DEBUG_POSITION) {
         TraceVerbose(TAG, L"SetPositionX [%ws:%f]", element->GetType()->FullName->Data(), value);
     }
@@ -940,11 +935,11 @@ void LayerProperties::SetPositionX(FrameworkElement^ element, float value) {
     element->SetValue(s_positionProperty, point);
 }
 
-float LayerProperties::GetPositionY(FrameworkElement^ element) {
+float LayerCoordinator::GetPositionY(FrameworkElement^ element) {
     return static_cast<Point>(element->GetValue(s_positionProperty)).Y;
 }
 
-void LayerProperties::SetPositionY(FrameworkElement^ element, float value) {
+void LayerCoordinator::SetPositionY(FrameworkElement^ element, float value) {
     if (DEBUG_POSITION) {
         TraceVerbose(TAG, L"SetPositionY [%ws:%f]", element->GetType()->FullName->Data(), value);
     }
@@ -954,93 +949,93 @@ void LayerProperties::SetPositionY(FrameworkElement^ element, float value) {
     element->SetValue(s_positionProperty, point);
 }
 
-TranslateTransform^ LayerProperties::GetPositionTransform(FrameworkElement^ element) {
+TranslateTransform^ LayerCoordinator::GetPositionTransform(FrameworkElement^ element) {
     return safe_cast<TranslateTransform^>(safe_cast<TransformGroup^>(element->RenderTransform)->Children->GetAt(3));
 }
 
-String^ LayerProperties::GetPositionXTransformPath() {
+String^ LayerCoordinator::GetPositionXTransformPath() {
     static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[3].(TranslateTransform.X)";
     return path;
 }
 
-String^ LayerProperties::GetPositionYTransformPath() {
+String^ LayerCoordinator::GetPositionYTransformPath() {
     static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[3].(TranslateTransform.Y)";
     return path;
 }
 
 // Rotation
-RotateTransform^ LayerProperties::GetRotationTransform(FrameworkElement^ element) {
+RotateTransform^ LayerCoordinator::GetRotationTransform(FrameworkElement^ element) {
     return safe_cast<RotateTransform^>(
         safe_cast<TransformGroup^>(
             safe_cast<TransformGroup^>(element->RenderTransform)->Children->GetAt(2))->Children->GetAt(0));
 }
 
-String^ LayerProperties::GetRotationTransformPath() {
+String^ LayerCoordinator::GetRotationTransformPath() {
     static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[0].(RotateTransform.Angle)";
     return path;
 }
 
 // Scale
-ScaleTransform^ LayerProperties::GetScaleTransform(FrameworkElement^ element) {
+ScaleTransform^ LayerCoordinator::GetScaleTransform(FrameworkElement^ element) {
     return safe_cast<ScaleTransform^>(
         safe_cast<TransformGroup^>(
             safe_cast<TransformGroup^>(element->RenderTransform)->Children->GetAt(2))->Children->GetAt(1));
 }
 
-String^ LayerProperties::GetScaleXTransformPath() {
+String^ LayerCoordinator::GetScaleXTransformPath() {
     static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[1].(ScaleTransform.ScaleX)";
     return path;
 }
 
-String^ LayerProperties::GetScaleYTransformPath() {
+String^ LayerCoordinator::GetScaleYTransformPath() {
     static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[1].(ScaleTransform.ScaleY)";
     return path;
 }
 
 // Translation
-TranslateTransform^ LayerProperties::GetTranslationTransform(FrameworkElement^ element) {
+TranslateTransform^ LayerCoordinator::GetTranslationTransform(FrameworkElement^ element) {
     return safe_cast<TranslateTransform^>(
         safe_cast<TransformGroup^>(
             safe_cast<TransformGroup^>(element->RenderTransform)->Children->GetAt(2))->Children->GetAt(2));
 }
 
-String^ LayerProperties::GetTranslationXTransformPath() {
+String^ LayerCoordinator::GetTranslationXTransformPath() {
     static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[2].(TranslateTransform.X)";
     return path;
 }
 
-String^ LayerProperties::GetTranslationYTransformPath() {
+String^ LayerCoordinator::GetTranslationYTransformPath() {
     static String^ path = L"(UIElement.RenderTransform).(TransformGroup.Children)[2].(TransformGroup.Children)[2].(TranslateTransform.Y)";
     return path;
 }
 
 // VisualWidth
-DependencyProperty^ LayerProperties::VisualWidthProperty::get() {
+DependencyProperty^ LayerCoordinator::VisualWidthProperty::get() {
     return s_visualWidthProperty;
 }
 
-double LayerProperties::GetVisualWidth(FrameworkElement^ element) {
+double LayerCoordinator::GetVisualWidth(FrameworkElement^ element) {
     return static_cast<double>(element->GetValue(s_visualWidthProperty));
 }
 
-void LayerProperties::SetVisualWidth(FrameworkElement^ element, double value) {
+void LayerCoordinator::SetVisualWidth(FrameworkElement^ element, double value) {
     element->SetValue(s_visualWidthProperty, value);
 }
 
 // VisualHeight
-DependencyProperty^ LayerProperties::VisualHeightProperty::get() {
+DependencyProperty^ LayerCoordinator::VisualHeightProperty::get() {
     return s_visualHeightProperty;
 }
 
-double LayerProperties::GetVisualHeight(FrameworkElement^ element) {
+double LayerCoordinator::GetVisualHeight(FrameworkElement^ element) {
     return static_cast<double>(element->GetValue(s_visualHeightProperty));
 }
 
-void LayerProperties::SetVisualHeight(FrameworkElement^ element, double value) {
+void LayerCoordinator::SetVisualHeight(FrameworkElement^ element, double value) {
     element->SetValue(s_visualHeightProperty, value);
 }
 
-void LayerProperties::_sizeChangedCallback(DependencyObject^ sender, DependencyPropertyChangedEventArgs^ args) {
+void LayerCoordinator::_sizeChangedCallback(DependencyObject^ sender, DependencyPropertyChangedEventArgs^ args) {
     auto element = safe_cast<FrameworkElement^>(sender);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
@@ -1053,20 +1048,20 @@ void LayerProperties::_sizeChangedCallback(DependencyObject^ sender, DependencyP
 }
 
 // ContentGravity
-DependencyProperty^ LayerProperties::ContentGravityProperty::get() {
+DependencyProperty^ LayerCoordinator::ContentGravityProperty::get() {
     return s_contentGravityProperty;
 }
 
-ContentGravity LayerProperties::GetContentGravity(FrameworkElement^ element) {
+ContentGravity LayerCoordinator::GetContentGravity(FrameworkElement^ element) {
     return static_cast<ContentGravity>(element->GetValue(s_contentGravityProperty));
 }
 
-void LayerProperties::SetContentGravity(FrameworkElement^ element, ContentGravity value) {
+void LayerCoordinator::SetContentGravity(FrameworkElement^ element, ContentGravity value) {
     element->SetValue(s_contentGravityProperty, value);
     _ApplyContentGravity(element, value);
 }
 
-void LayerProperties::_ApplyContentGravity(FrameworkElement^ element, ContentGravity gravity) {
+void LayerCoordinator::_ApplyContentGravity(FrameworkElement^ element, ContentGravity gravity) {
     // Calculate aspect ratio
     Size contentSize = _GetContentSize(element);
     double widthAspect = element->Width / contentSize.Width;
@@ -1196,19 +1191,19 @@ void LayerProperties::_ApplyContentGravity(FrameworkElement^ element, ContentGra
 }
 
 // ContentSize
-DependencyProperty^ LayerProperties::ContentSizeProperty::get() {
+DependencyProperty^ LayerCoordinator::ContentSizeProperty::get() {
     return s_contentSizeProperty;
 }
 
-Size LayerProperties::_GetContentSize(FrameworkElement^ element) {
+Size LayerCoordinator::_GetContentSize(FrameworkElement^ element) {
     return static_cast<Size>(element->GetValue(s_contentSizeProperty));
 }
 
-void LayerProperties::_SetContentSize(Windows::UI::Xaml::FrameworkElement^ element, Size value) {
+void LayerCoordinator::_SetContentSize(Windows::UI::Xaml::FrameworkElement^ element, Size value) {
     element->SetValue(s_contentSizeProperty, value);
 }
 
-void LayerProperties::AddAnimation(Platform::String^ propertyName,
+void LayerCoordinator::AddAnimation(Platform::String^ propertyName,
                                    FrameworkElement^ target,
                                    Media::Animation::Storyboard^ storyboard,
                                    Media::Animation::DoubleAnimation^ copyProperties,

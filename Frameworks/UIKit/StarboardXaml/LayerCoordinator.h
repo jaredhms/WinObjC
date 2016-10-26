@@ -34,22 +34,20 @@ public enum class ContentGravity {
     BottomRight
 };
 
-/////////////////////////////////////////////
-// Layer property management
 [Windows::Foundation::Metadata::WebHostHidden]
-public ref class LayerProperties : public Windows::UI::Xaml::DependencyObject {
+public ref class LayerCoordinator : public Windows::UI::Xaml::DependencyObject {
 internal:
     // Initialize a FrameworkElement for CALayer support
     static void InitializeFrameworkElement(Windows::UI::Xaml::FrameworkElement^ element);
 
     // CALayer property managment support
-    static void SetValue(Windows::UI::Xaml::FrameworkElement^ element, Platform::String^ propertyName, Platform::Object^ value);
-    static Platform::Object^ GetValue(Windows::UI::Xaml::FrameworkElement^ element, Platform::String^ propertyName);
+    static void SetValue(Windows::UI::Xaml::FrameworkElement^ element, const char* propertyName, Platform::Object^ value);
+    static Platform::Object^ GetValue(Windows::UI::Xaml::FrameworkElement^ element, const char* propertyName);
     static void AnimateValue(
         Windows::UI::Xaml::FrameworkElement^ element, 
         Windows::UI::Xaml::Media::Animation::Storyboard^ storyboard,
         Windows::UI::Xaml::Media::Animation::DoubleAnimation^ properties,
-        Platform::String^ propertyName,
+        const char* propertyName,
         Platform::Object^ fromValue,
         Platform::Object^ toValue);
 
@@ -62,9 +60,9 @@ internal:
         float scale);
     static void SetContentCenter(Windows::UI::Xaml::FrameworkElement^ element, Windows::Foundation::Rect rect);
 
-    // CALayer border support
     ////////////////////////////////////
     // TODO: Add border support
+    // CALayer border support
 
 ///////////////////////////////////////////////////////////////////////////////////
 // TODO: EVERYTHING BELOW SHOULD/CAN PROB GO INTO A .CPP FILE AS A HELPER REF CLASS
@@ -156,7 +154,7 @@ internal:
                              bool dependent = false);
 
 private:
-    static void _registerDependencyProperties();
+    static void _RegisterDependencyProperties();
     static bool s_dependencyPropertiesRegistered;
 
     static Windows::UI::Xaml::DependencyProperty^ s_anchorPointProperty;

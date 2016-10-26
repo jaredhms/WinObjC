@@ -36,8 +36,6 @@ public:
 #endif
 
     void Stop();
-
-    // TODO: CAN WE DO const ILayerProxy&????
     virtual concurrency::task<void> AddToLayer(ILayerProxy& layer) = 0;
 
 protected:
@@ -48,14 +46,11 @@ protected:
     void _Start();
     virtual void _Completed() = 0;
 
-    // TODO: CAN WE DO const ILayerProxy&????
     concurrency::task<void> _AddAnimation(
-        ILayerProxy& layer, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to);
-    // TODO: CAN WE DO const ILayerProxy&????
+        ILayerProxy& layer, const char* propertyName, bool fromValid, float from, bool toValid, float to);
     concurrency::task<void> _AddTransitionAnimation(ILayerProxy& layer, const char* type, const char* subtype);
 
-    // TODO: SWITCH TO COMPTR?
-    Microsoft::WRL::ComPtr<IInspectable> _xamlAnimation;
+    Microsoft::WRL::ComPtr<IInspectable> _storyboardManager;
     enum Easing { EaseInEaseOut, EaseIn, EaseOut, Linear, Default };
 
     double beginTime;

@@ -40,33 +40,33 @@ public:
     void SetTopMost() override;
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    // Display properties
-    void SetProperty(const wchar_t* name, float value);
-    void SetPropertyInt(const wchar_t* name, int value);
-    void SetHidden(bool hidden);
-    void SetMasksToBounds(bool masksToBounds);
-    void SetBackgroundColor(float r, float g, float b, float a);
-    void SetTexture(const std::shared_ptr<IDisplayTexture>& texture, float width, float height, float scale);
-    void SetContents(const Microsoft::WRL::ComPtr<IInspectable>& bitmap, float width, float height, float scale);
-    void SetContentsCenter(float x, float y, float width, float height);
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    // TODO: SHOULD REMOVE AND JUST DO ON UIWINDOW'S CANVAS
-    void SetZIndex(int zIndex);
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-
     // General property management
     void UpdateProperty(const char* name, void* value);
 
     // Sublayer management
     void AddToRoot();
     void AddSubLayer(const std::shared_ptr<LayerProxy>& subLayer,
-                     const std::shared_ptr<LayerProxy>& before,
-                     const std::shared_ptr<LayerProxy>& after);
+        const std::shared_ptr<LayerProxy>& before,
+        const std::shared_ptr<LayerProxy>& after);
     void MoveLayer(const std::shared_ptr<LayerProxy>& before, const std::shared_ptr<LayerProxy>& after);
     void RemoveFromSuperLayer();
 
-protected:
+private:
+    // Display properties
+    void _SetProperty(const char* name, float value);
+    void _SetPropertyInt(const char* name, int value);
+    void _SetHidden(bool hidden);
+    void _SetMasksToBounds(bool masksToBounds);
+    void _SetBackgroundColor(float r, float g, float b, float a);
+    void _SetTexture(const std::shared_ptr<IDisplayTexture>& texture, float width, float height, float scale);
+    void _SetContents(const Microsoft::WRL::ComPtr<IInspectable>& bitmap, float width, float height, float scale);
+    void _SetContentsCenter(float x, float y, float width, float height);
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // TODO: SHOULD REMOVE AND JUST DO ON UIWINDOW'S CANVAS
+    void _SetZIndex(int zIndex);
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
     // Property management
     float _GetPresentationPropertyValue(const char* name);
 
