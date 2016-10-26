@@ -45,7 +45,8 @@ public:
 };
 
 struct ILayerProxy;
-class DisplayTexture;
+struct IDisplayTexture;
+
 @class CALayer;
 
 class CAPrivateInfo : public CADisplayProperties, public LLTreeNode<CAPrivateInfo, CALayer> {
@@ -115,7 +116,7 @@ public:
 + (CGPoint)convertPoint:(CGPoint)point fromLayer:(CALayer*)layer toLayer:(CALayer*)layer;
 
 - (void)_removeAnimation:(CAAnimation*)animation;
-- (std::shared_ptr<DisplayTexture>)_getDisplayTexture;
+- (std::shared_ptr<IDisplayTexture>)_getDisplayTexture;
 
 - (CAPrivateInfo*)_priv;
 - (void)_setRootLayer:(BOOL)isRootLayer;

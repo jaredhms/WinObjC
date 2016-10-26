@@ -628,9 +628,6 @@ void LayerProperties::InitializeFrameworkElement(FrameworkElement^ element) {
     sizeAnchorTransform->Y = -height * GetAnchorPointY(element);
 
     // Set up the origin transform
-    /////////////////////////////////////////////////////////////////////////////////////////
-    // TODO: Curious - why are these negative yet the clip geometry is positive?
-    /////////////////////////////////////////////////////////////////////////////////////////
     auto originTransform = ref new TranslateTransform(); // origin
     originTransform->X = -GetOriginX(element);
     originTransform->Y = -GetOriginY(element);

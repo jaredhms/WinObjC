@@ -36,8 +36,8 @@ __inline CoreAnimation::EventedStoryboard^ _GetStoryboard(const Microsoft::WRL::
     return dynamic_cast<CoreAnimation::EventedStoryboard^>(reinterpret_cast<Platform::Object^>(xamlAnimation.Get()));
 }
 
-__inline FrameworkElement^ _GetXamlElement(ILayerProxy& node) {
-    return dynamic_cast<FrameworkElement^>(reinterpret_cast<Platform::Object^>(reinterpret_cast<LayerProxy*>(&node)->GetXamlElement().Get()));
+__inline FrameworkElement^ _GetXamlElement(ILayerProxy& layer) {
+    return dynamic_cast<FrameworkElement^>(reinterpret_cast<Platform::Object^>(reinterpret_cast<LayerProxy*>(&layer)->GetXamlElement().Get()));
 };
 
 LayerAnimation::LayerAnimation() {
@@ -104,11 +104,11 @@ void LayerAnimation::Stop() {
     _xamlAnimation = nullptr;
 }
 
-concurrency::task<void> LayerAnimation::_AddAnimation(ILayerProxy& node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to) {
-    auto xamlNode = _GetXamlElement(node);
+concurrency::task<void> LayerAnimation::_AddAnimation(ILayerProxy& layer, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to) {
+    auto xamlLayer = _GetXamlElement(layer);
     auto xamlAnimation = _GetStoryboard(_xamlAnimation);
 
-    xamlAnimation->Animate(xamlNode,
+    xamlAnimation->Animate(xamlLayer,
         ref new Platform::String(propertyName),
         fromValid ? (Platform::Object^)(double)from : nullptr,
         toValid ? (Platform::Object^)(double)to : nullptr);
@@ -116,8 +116,8 @@ concurrency::task<void> LayerAnimation::_AddAnimation(ILayerProxy& node, const w
     return concurrency::task_from_result();
 }
 
-concurrency::task<void> LayerAnimation::_AddTransitionAnimation(ILayerProxy& node, const char* type, const char* subtype) {
-    auto xamlNode = _GetXamlElement(node);
+concurrency::task<void> LayerAnimation::_AddTransitionAnimation(ILayerProxy& layer, const char* type, const char* subtype) {
+    auto xamlLayer = _GetXamlElement(layer);
     auto xamlAnimation = _GetStoryboard(_xamlAnimation);
 
     std::string stype(type);
@@ -126,11 +126,11 @@ concurrency::task<void> LayerAnimation::_AddTransitionAnimation(ILayerProxy& nod
     std::wstring wsubtype(ssubtype.begin(), ssubtype.end());
 
     // We currently only support layer snapshots/transitions on our default Layer implementation
-    auto coreAnimationLayer = dynamic_cast<Layer^>(xamlNode);
+    auto coreAnimationLayer = dynamic_cast<Layer^>(xamlLayer);
     if (!coreAnimationLayer) {
         UNIMPLEMENTED_WITH_MSG(
             "Layer transition animations not supported on this Xaml element: [%ws].",
-            xamlNode->GetType()->FullName->Data());
+            xamlLayer->GetType()->FullName->Data());
         return concurrency::task_from_result();
     }
 

@@ -53,7 +53,7 @@ public:
 
     // ILayerTransaction display management
     void SetLayerTexture(const std::shared_ptr<ILayerProxy>& layer,
-        const std::shared_ptr<DisplayTexture>& newTexture,
+        const std::shared_ptr<IDisplayTexture>& newTexture,
         CGSize contentsSize,
         float contentsScale) override;
 

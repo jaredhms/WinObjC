@@ -15,4 +15,4 @@
 //******************************************************************************
 #pragma once
 
-extern "C" void SetXamlRoot(Windows::UI::Xaml::Controls::Grid ^ grid, ActivationType activationType);
+void SetXamlRoot(Windows::UI::Xaml::Controls::Grid ^ grid, ActivationType activationType);

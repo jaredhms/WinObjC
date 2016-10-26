@@ -18,11 +18,6 @@
 #include "CACompositor.h"
 #include "winobjc\winobjc.h"
 
-///////////////////////////////////////////////////////////////////////
-// TODO: Will be DisplayTexture.h if we move it to its own file too
-#include "CompositorInterface.h"
-///////////////////////////////////////////////////////////////////////
-
 #include <memory>
 #include <set>
 
@@ -52,13 +47,13 @@ public:
     void SetHidden(bool hidden);
     void SetMasksToBounds(bool masksToBounds);
     void SetBackgroundColor(float r, float g, float b, float a);
-    void SetTexture(const std::shared_ptr<DisplayTexture>& texture, float width, float height, float scale);
+    void SetTexture(const std::shared_ptr<IDisplayTexture>& texture, float width, float height, float scale);
     void SetContents(const Microsoft::WRL::ComPtr<IInspectable>& bitmap, float width, float height, float scale);
     void SetContentsCenter(float x, float y, float width, float height);
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     // TODO: SHOULD REMOVE AND JUST DO ON UIWINDOW'S CANVAS
-    void SetNodeZIndex(int zIndex);
+    void SetZIndex(int zIndex);
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     // General property management
@@ -66,11 +61,11 @@ public:
 
     // Sublayer management
     void AddToRoot();
-    void AddSubnode(const std::shared_ptr<LayerProxy>& subNode,
+    void AddSubLayer(const std::shared_ptr<LayerProxy>& subLayer,
                     const std::shared_ptr<LayerProxy>& before,
                     const std::shared_ptr<LayerProxy>& after);
-    void MoveNode(const std::shared_ptr<LayerProxy>& before, const std::shared_ptr<LayerProxy>& after);
-    void RemoveFromSupernode();
+    void MoveLayer(const std::shared_ptr<LayerProxy>& before, const std::shared_ptr<LayerProxy>& after);
+    void RemoveFromSuperLayer();
 
 protected:
     // Property management
@@ -79,8 +74,8 @@ protected:
     bool _isRoot;
     // TODO: weak_ptr or reference??
     LayerProxy* _parent;
-    std::set<std::shared_ptr<LayerProxy>> _subnodes;
-    std::shared_ptr<DisplayTexture> _currentTexture;
+    std::set<std::shared_ptr<LayerProxy>> _subLayers;
+    std::shared_ptr<IDisplayTexture> _currentTexture;
     bool _topMost;
 
 private:

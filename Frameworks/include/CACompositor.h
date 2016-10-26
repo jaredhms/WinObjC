@@ -46,10 +46,8 @@ public:
     virtual void* GetPropertyValue(const char* propertyName) = 0;
     virtual void SetShouldRasterize(bool shouldRasterize) = 0;
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    // TODO: Can we remove this altogether and just set the z-index on the backing xaml element?
+    // TODO: Can we remove this altogether at some point?
     virtual void SetTopMost() = 0;
-    ///////////////////////////////////////////////////////////////////////////////////////////////
 };
 
 // Proxy between CAAnimation and its Xaml representation
@@ -58,9 +56,17 @@ public:
     virtual ~ILayerAnimation() {}
 };
 
-#if defined(__cplusplus) && defined(__OBJC__)
+// Proxy for CG-rendered content
+struct IDisplayTexture {
+public:
+    virtual ~IDisplayTexture() {}
 
-class DisplayTexture;
+    virtual Microsoft::WRL::ComPtr<IInspectable> GetContent() = 0;
+    virtual void* Lock(int* stride) = 0;
+    virtual void Unlock() = 0;
+};
+
+#if defined(__cplusplus) && defined(__OBJC__)
 
 // Proxy between CATransaction and its backing implementation
 struct ILayerTransaction {
@@ -84,7 +90,7 @@ public:
 
     // Display management
     virtual void SetLayerTexture(const std::shared_ptr<ILayerProxy>& layer,
-                                const std::shared_ptr<DisplayTexture>& newTexture,
+                                const std::shared_ptr<IDisplayTexture>& newTexture,
                                 CGSize contentsSize,
                                 float contentsScale) = 0;
 
@@ -126,22 +132,14 @@ public:
                                                                       NSString* type,
                                                                       NSString* subtype) = 0;
 
-    // DisplayTextures
-    virtual std::shared_ptr<DisplayTexture> GetDisplayTextureForCGImage(CGImageRef img, bool create) = 0;
-    virtual Microsoft::WRL::ComPtr<IInspectable> GetBitmapForCGImage(CGImageRef img) = 0;
+    // DisplayTexture support
+    virtual std::shared_ptr<IDisplayTexture> CreateDisplayTexture(int width, int height) = 0;
+    virtual std::shared_ptr<IDisplayTexture> GetDisplayTextureForCGImage(CGImageRef img) = 0;
 
-    ////////////////////////////////////////////////////////////////////////
-    // TODO: Move to some bitmap/texture helper API?
-    virtual std::shared_ptr<DisplayTexture> CreateWritableBitmapTexture32(int width, int height) = 0;
-    virtual void* LockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& texture, int* stride) = 0;
-    virtual void UnlockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& texture) = 0;
-    ////////////////////////////////////////////////////////////////////////
-
-    ////////////////////////////////////////////////////////////////////////
-    // TODO: Move to some displaylink helper API
+    // DisplayLink support
+    // TODO: Move to a displaylink helper API?
     virtual void EnableDisplaySyncNotification() = 0;
     virtual void DisableDisplaySyncNotification() = 0;
-    ////////////////////////////////////////////////////////////////////////
 };
 
 extern CACompositorInterface* _globalCompositor;
@@ -154,4 +152,5 @@ CA_EXPORT CACompositorInterface* GetCACompositor();
 CA_EXPORT void SetCACompositor(CACompositorInterface* compositorInterface);
 
 CA_EXPORT bool CASignalDisplayLink();
+
 #endif

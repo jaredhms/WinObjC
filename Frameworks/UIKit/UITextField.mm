@@ -24,7 +24,7 @@
 #import "CGContextInternal.h"
 #import <CoreGraphics/CGContext.h>
 
-#import "CACompositor.h"
+#import "StarboardXaml/DisplayTexture.h"
 #import "UIApplicationInternal.h"
 #import "UIResponderInternal.h"
 #import <Foundation/NSNotificationCenter.h>
@@ -473,7 +473,7 @@ void SetTextControlContentVerticalAlignment(WXCControl* control, WXVerticalAlign
     }
 
     if (_borderStyle != UITextBorderStyleRoundedRect) {
-        Microsoft::WRL::ComPtr<IInspectable> inspectableNode(GetCACompositor()->GetBitmapForCGImage(cgImg));
+        Microsoft::WRL::ComPtr<IInspectable> inspectableNode(DisplayTexture::GetBitmapForCGImage(cgImg));
         WUXMIBitmapSource* bitmapImageSource = CreateRtProxy([WUXMIBitmapSource class], inspectableNode.Get());
         WUXMImageBrush* imageBrush = [WUXMImageBrush make];
         imageBrush.imageSource = bitmapImageSource;

@@ -24,7 +24,7 @@
 
 static const wchar_t* TAG = L"LayerProxy";
 
-void LayerProxy::SetTexture(const std::shared_ptr<DisplayTexture>& texture, float width, float height, float contentScale) {
+void LayerProxy::SetTexture(const std::shared_ptr<IDisplayTexture>& texture, float width, float height, float contentScale) {
     _currentTexture = texture;
     SetContents((texture ? texture->GetContent() : nullptr), width, height, contentScale);
 }
@@ -164,7 +164,7 @@ void LayerProxy::UpdateProperty(const char* name, void* value) {
         ///////////////////////////////////////////////////////////////////////////////////////
         // TODO: This should just happen in UIWindow.mm and should get deleted from here
         int value = [(NSNumber*)newValue intValue];
-        SetNodeZIndex(value);
+        SetZIndex(value);
         ///////////////////////////////////////////////////////////////////////////////////////
     } else if (strcmp(name, "gravity") == 0) {
         SetPropertyInt(L"gravity", [(NSNumber*)newValue intValue]);

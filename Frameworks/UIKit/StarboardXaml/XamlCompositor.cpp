@@ -68,16 +68,19 @@ void SetRootGrid(winobjc::Id& root) {
     rootNode->SizeChanged += ref new SizeChangedEventHandler(&OnGridSizeChanged);
 }
 
-void (*RenderCallback)();
+void (*RenderCallback)() = nullptr;
 
 ref class XamlRenderingListener sealed {
 private:
     bool _isListening = false;
     Windows::Foundation::EventHandler<Platform::Object^>^ listener;
     Windows::Foundation::EventRegistrationToken listenerToken;
-    internal : void RenderedFrame(Object^ sender, Object^ args) {
-        if (RenderCallback)
+internal: 
+
+    void RenderedFrame(Object^ sender, Object^ args) {
+        if (RenderCallback) {
             RenderCallback();
+        }
     }
 
     XamlRenderingListener() {
@@ -113,66 +116,6 @@ void DisableRenderingListener() {
     renderListener->Stop();
 }
 
-ComPtr<IInspectable> CreateBitmapFromImageData(const void* ptr, int len) {
-    auto bitmap = ref new Media::Imaging::BitmapImage;
-    auto stream = ref new Windows::Storage::Streams::InMemoryRandomAccessStream();
-    auto rw = ref new Windows::Storage::Streams::DataWriter(stream->GetOutputStreamAt(0));
-    auto var = ref new Platform::Array<unsigned char, 1>(len);
-
-    memcpy(var->Data, ptr, len);
-    rw->WriteBytes(var);
-    rw->StoreAsync();
-
-    auto loadImage = bitmap->SetSourceAsync(stream);
-
-    return reinterpret_cast<IInspectable*>(bitmap);
-}
-
-ComPtr<IInspectable> CreateBitmapFromBits(void* ptr, int width, int height, int stride) {
-    auto bitmap = ref new Media::Imaging::WriteableBitmap(width, height);
-    Windows::Storage::Streams::IBuffer^ pixelData = bitmap->PixelBuffer;
-
-    ComPtr<IBufferByteAccess> bufferByteAccess;
-    reinterpret_cast<IInspectable*>(pixelData)->QueryInterface(IID_PPV_ARGS(&bufferByteAccess));
-
-    // Retrieve the buffer data.
-    byte* pixels = nullptr;
-    bufferByteAccess->Buffer(&pixels);
-
-    byte* in = (byte*)ptr;
-    for (int y = 0; y < height; y++) {
-        memcpy(pixels, in, stride);
-        pixels += width * 4;
-        in += stride;
-    }
-
-    return reinterpret_cast<IInspectable*>(bitmap);
-}
-
-ComPtr<IInspectable> CreateWritableBitmap(int width, int height) {
-    auto bitmap = ref new Media::Imaging::WriteableBitmap(width, height);
-    return reinterpret_cast<IInspectable*>(bitmap);
-}
-
-ComPtr<IInspectable> LockWritableBitmap(const ComPtr<IInspectable>& bitmap, void** ptr, int* stride) {
-    auto writableBitmap = dynamic_cast<Media::Imaging::WriteableBitmap^>(reinterpret_cast<Platform::Object^>(bitmap.Get()));
-
-    Windows::Storage::Streams::IBuffer^ pixelData = writableBitmap->PixelBuffer;
-
-    *stride = writableBitmap->PixelWidth * 4;
-
-    ComPtr<IBufferByteAccess> bufferByteAccess;
-    reinterpret_cast<IInspectable*>(pixelData)->QueryInterface(IID_PPV_ARGS(&bufferByteAccess));
-    byte* pixels = nullptr;
-    bufferByteAccess->Buffer(&pixels);
-    *ptr = pixels;
-
-    // Return IInspectable back to the .mm side
-    ComPtr<IInspectable> inspectableByteAccess;
-    bufferByteAccess.As(&inspectableByteAccess);
-    return inspectableByteAccess;
-}
-
 void SetScreenParameters(float width, float height, float magnification, float rotation) {
     windowCollection->Width = width;
     windowCollection->Height = height;
@@ -202,7 +145,7 @@ void SetScreenParameters(float width, float height, float magnification, float r
     windowCollection->RenderTransform = globalTransform;
 }
 
-extern "C" void SetXamlRoot(Windows::UI::Xaml::Controls::Grid^ grid, ActivationType activationType) {
+void SetXamlRoot(Windows::UI::Xaml::Controls::Grid^ grid, ActivationType activationType) {
     winobjc::Id gridObj((Platform::Object^)grid);
     CreateXamlCompositor(gridObj, ((activationType == ActivationTypeLibrary) ? CompositionModeLibrary : CompositionModeDefault));
 }
@@ -228,18 +171,18 @@ void DispatchCompositorTransactions(
         }, concurrency::task_continuation_context::use_current());
     }
 
-    // Walk and process the map of queued properties per ILayerProxy and the list of node movements as a single distinct task
+    // Walk and process the map of queued properties per ILayerProxy and the list of layer movements as a single distinct task
     s_compositorTransactions = s_compositorTransactions
         .then([movementTransactions = std::move(movementTransactions),
             propertyTransactions = std::move(propertyTransactions)]() noexcept {
-        for (auto& nodeMovement : movementTransactions) {
-            nodeMovement->Process();
+        for (auto& layerMovement : movementTransactions) {
+            layerMovement->Process();
         }
 
-        for (auto& nodeProperties : propertyTransactions) {
+        for (auto& layerProperties : propertyTransactions) {
             // Walk the map of queued properties for this ILayerProxy
-            for (auto& nodeProperty : nodeProperties.second) {
-                nodeProperty.second->Process();
+            for (auto& layerProperty : layerProperties.second) {
+                layerProperty.second->Process();
             }
         }
     }, concurrency::task_continuation_context::use_current());

@@ -63,8 +63,8 @@ public:
                 ///////////////////////////////////////////////
 
                 if (newAnimation) {
-                    std::shared_ptr<ILayerProxy> node = [_layer _layerProxy];
-                    return std::dynamic_pointer_cast<LayerAnimation>(newAnimation)->AddToNode(*node);
+                    std::shared_ptr<ILayerProxy> layer = [_layer _layerProxy];
+                    return std::dynamic_pointer_cast<LayerAnimation>(newAnimation)->AddToLayer(*layer);
                 } else {
                     ///////////////////////////////////////////////
                     // TODO: Call in _createAnimation on failure?
@@ -80,16 +80,16 @@ public:
 
 class QueuedProperty : public ICompositorTransaction {
 public:
-    std::shared_ptr<LayerProxy> _node;
+    std::shared_ptr<LayerProxy> _layer;
     char* _propertyName;
     NSObject* _propertyValue;
-    std::shared_ptr<DisplayTexture> _newTexture;
+    std::shared_ptr<IDisplayTexture> _newTexture;
     CGSize _contentsSize;
     float _contentsScale;
     bool _applyingTexture;
 
-    QueuedProperty(const std::shared_ptr<ILayerProxy>& layer, const std::shared_ptr<DisplayTexture>& newTexture, CGSize contentsSize, float contentsScale) {
-        _node = std::dynamic_pointer_cast<LayerProxy>(layer);
+    QueuedProperty(const std::shared_ptr<ILayerProxy>& layer, const std::shared_ptr<IDisplayTexture>& newTexture, CGSize contentsSize, float contentsScale) {
+        _layer = std::dynamic_pointer_cast<LayerProxy>(layer);
         _propertyName = IwStrDup("contents");
         _propertyValue = NULL;
         _newTexture = newTexture;
@@ -99,7 +99,7 @@ public:
     }
 
     QueuedProperty(const std::shared_ptr<ILayerProxy>& layer, const char* propertyName, NSObject* propertyValue) {
-        _node = std::dynamic_pointer_cast<LayerProxy>(layer);
+        _layer = std::dynamic_pointer_cast<LayerProxy>(layer);
         _propertyName = IwStrDup(propertyName);
         _propertyValue = [propertyValue retain];
         _newTexture = NULL;
@@ -118,52 +118,52 @@ public:
 
     void Process() override {
         if (_applyingTexture) {
-            _node->SetTexture(_newTexture, _contentsSize.width, _contentsSize.height, _contentsScale);
+            _layer->SetTexture(_newTexture, _contentsSize.width, _contentsSize.height, _contentsScale);
         } else {
-            _node->UpdateProperty(_propertyName, _propertyValue);
+            _layer->UpdateProperty(_propertyName, _propertyValue);
         }
     }
 };
 
 class QueuedMovement : public ICompositorTransaction {
 public:
-    std::shared_ptr<LayerProxy> _node;
+    std::shared_ptr<LayerProxy> _layer;
     std::shared_ptr<LayerProxy> _before;
     std::shared_ptr<LayerProxy> _after;
-    std::shared_ptr<LayerProxy> _supernode;
+    std::shared_ptr<LayerProxy> _superLayer;
 
     enum MovementType { Add, Move, Remove };
 
     MovementType _type;
 
     QueuedMovement(MovementType type,
-                       const std::shared_ptr<ILayerProxy>& node,
+                       const std::shared_ptr<ILayerProxy>& layer,
                        const std::shared_ptr<ILayerProxy>& before,
                        const std::shared_ptr<ILayerProxy>& after,
-                       const std::shared_ptr<ILayerProxy>& supernode) {
+                       const std::shared_ptr<ILayerProxy>& superLayer) {
         _type = type;
-        _node = std::dynamic_pointer_cast<LayerProxy>(node);
+        _layer = std::dynamic_pointer_cast<LayerProxy>(layer);
         _before = std::dynamic_pointer_cast<LayerProxy>(before);
         _after = std::dynamic_pointer_cast<LayerProxy>(after);
-        _supernode = std::dynamic_pointer_cast<LayerProxy>(supernode);
+        _superLayer = std::dynamic_pointer_cast<LayerProxy>(superLayer);
     }
 
     void Process() override {
         switch (_type) {
             case Add:
-                if (!_supernode) {
-                    _node->AddToRoot();
+                if (!_superLayer) {
+                    _layer->AddToRoot();
                 } else {
-                    _supernode->AddSubnode(_node, _before, _after);
+                    _superLayer->AddSubLayer(_layer, _before, _after);
                 }
                 break;
 
             case Move:
-                _node->MoveNode(_before, _after);
+                _layer->MoveLayer(_before, _after);
                 break;
 
             case Remove:
-                _node->RemoveFromSupernode();
+                _layer->RemoveFromSuperLayer();
                 break;
         }
     }
@@ -195,7 +195,7 @@ void LayerTransaction::SetLayerProperty(const std::shared_ptr<ILayerProxy>& laye
 }
 
 void LayerTransaction::SetLayerTexture(const std::shared_ptr<ILayerProxy>& layer,
-    const std::shared_ptr<DisplayTexture>& newTexture,
+    const std::shared_ptr<IDisplayTexture>& newTexture,
     CGSize contentsSize,
     float contentsScale) {
     _QueueProperty(std::make_shared<QueuedProperty>(layer, newTexture, contentsSize, contentsScale));
@@ -217,12 +217,12 @@ void LayerTransaction::Process() {
 }
 
 void LayerTransaction::_QueueProperty(const std::shared_ptr<QueuedProperty> property) {
-    auto& currentUpdates = _queuedProperties[property->_node];
+    auto& currentUpdates = _queuedProperties[property->_layer];
     currentUpdates[property->_propertyName] = property;
 }
 
-void LayerTransaction::_QueueMovement(const std::shared_ptr<QueuedMovement>& nodeMovement) {
-    _queuedMovements.push_back(nodeMovement);
+void LayerTransaction::_QueueMovement(const std::shared_ptr<QueuedMovement>& layerMovement) {
+    _queuedMovements.push_back(layerMovement);
 }
 
 void LayerTransaction::_QueueAnimation(const std::shared_ptr<QueuedAnimation>& animation) {

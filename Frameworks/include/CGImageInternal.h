@@ -26,13 +26,7 @@ struct _cairo_surface;
 typedef struct _cairo_surface cairo_surface_t;
 
 class CGContextImpl;
-class DisplayTexture;
-
-class DisplayTextureLocking {
-public:
-    virtual void* LockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& tex, int* stride) = 0;
-    virtual void UnlockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& tex) = 0;
-};
+struct IDisplayTexture;
 
 class CGImageBacking {
 protected:
@@ -66,8 +60,8 @@ public:
     virtual cairo_surface_t* LockCairoSurface() = 0;
     virtual void ReleaseCairoSurface() = 0;
     virtual void SetFreeWhenDone(bool freeWhenDone) = 0;
-    virtual std::shared_ptr<DisplayTexture> GetDisplayTexture() {
-        return NULL;
+    virtual std::shared_ptr<IDisplayTexture> GetDisplayTexture() {
+        return nullptr;
     }
 
     virtual void DiscardIfPossible() {
@@ -90,7 +84,7 @@ typedef enum {
     CGImageTypeJPEG
 } CGImageType;
 
-class __CGImage : private objc_object {
+struct __CGImage : private objc_object {
 protected:
     CGImageBacking* _img;
 

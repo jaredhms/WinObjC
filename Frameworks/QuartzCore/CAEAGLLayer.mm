@@ -22,7 +22,6 @@
 #include "CALayerInternal.h"
 #include "UIKit/UIView.h"
 #include "QuartzCore/CAEAGLLayer.h"
-#include "CACompositor.h"
 #include "CAEAGLLayerInternal.h"
 
 #include <d3d11.h>
@@ -74,8 +73,8 @@
     return _swapChainPanel;
 }
 
-- (std::shared_ptr<DisplayTexture>)_getDisplayTexture {
-    return NULL;
+- (std::shared_ptr<IDisplayTexture>)_getDisplayTexture {
+    return nullptr;
 }
 
 /**

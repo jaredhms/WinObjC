@@ -334,6 +334,7 @@
   <!-- StarboardXaml files -->
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\XamlCompositor.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\DisplayTexture.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\LayerCoordinator.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\StoryboardManager.cpp" />
     <ClCompile Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\StarboardXaml.cpp" />
@@ -345,6 +346,7 @@
   <ItemGroup>
     <ClangCompile Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\CompositorInterface.mm" />
     <ClangCompile Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\DisplayProperties.mm" />
+    <ClangCompile Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\DisplayTexture.mm" />
     <ClangCompile Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\LayerAnimation.mm"/>
     <ClangCompile Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\LayerProxy.mm"/>
     <ClangCompile Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\LayerTransaction.mm"/>
@@ -360,6 +362,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\StoryboardManager.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\CompositorInterface.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\DisplayProperties.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\DisplayTexture.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\XamlTypeInfoRegistration.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\LayerAnimation.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\..\..\Frameworks\UIKit\StarboardXaml\LayerProxy.h" />

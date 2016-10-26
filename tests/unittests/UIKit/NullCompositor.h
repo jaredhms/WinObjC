@@ -19,6 +19,7 @@
 
 class NullCompositor : public CACompositorInterface {
 public:
+    // Compositor APIs
     bool IsRunningAsFramework() override {
         return false;
     }
@@ -26,6 +27,7 @@ public:
         return 1.0f;
     }
 
+    // CATransaction support
     std::shared_ptr<ILayerTransaction> CreateLayerTransaction() override {
         return nullptr;
     }
@@ -35,10 +37,12 @@ public:
     void ProcessLayerTransactions() override {
     }
 
+    // CALayer support
     std::shared_ptr<ILayerProxy> CreateLayerProxy(const Microsoft::WRL::ComPtr<IInspectable>& xamlElement) override {
         return nullptr;
     }
 
+    // CAAnimation support
     std::shared_ptr<ILayerAnimation> CreateBasicAnimation(CAAnimation* animation,
                                                                  NSString* propertyName,
                                                                  NSObject* fromValue,
@@ -53,22 +57,15 @@ public:
         return nullptr;
     }
 
-    std::shared_ptr<DisplayTexture> GetDisplayTextureForCGImage(CGImageRef img, bool create) override {
+    // DisplayTexture support
+    std::shared_ptr<IDisplayTexture> CreateDisplayTexture(int width, int height) override {
         return nullptr;
     }
-    Microsoft::WRL::ComPtr<IInspectable> GetBitmapForCGImage(CGImageRef img) override {
+    std::shared_ptr<IDisplayTexture> GetDisplayTextureForCGImage(CGImageRef img) override {
         return nullptr;
     }
 
-    std::shared_ptr<DisplayTexture> CreateWritableBitmapTexture32(int width, int height) override {
-        return nullptr;
-    }
-    void* LockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& tex, int* stride) override {
-        return nullptr;
-    }
-    void UnlockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& tex) override {
-    }
-
+    // DisplayLink support
     void EnableDisplaySyncNotification() override {
     }
     void DisableDisplaySyncNotification() override {

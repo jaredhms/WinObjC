@@ -73,8 +73,8 @@ LayerProxy::LayerProxy(IInspectable* xamlElement) :
 }
 
 LayerProxy::~LayerProxy() {
-    for (auto curNode : _subnodes) {
-        curNode->_parent = NULL;
+    for (auto layer : _subLayers) {
+        layer->_parent = nullptr;
     }
 }
 
@@ -84,57 +84,57 @@ Microsoft::WRL::ComPtr<IInspectable> LayerProxy::GetXamlElement() {
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // TODO: This should just happen in UIWindow.mm and should get deleted from here
-void LayerProxy::SetNodeZIndex(int zIndex) {
-    FrameworkElement^ xamlNode = _FrameworkElementFromInspectable(_xamlElement);
-    xamlNode->SetValue(Canvas::ZIndexProperty, zIndex);
+void LayerProxy::SetZIndex(int zIndex) {
+    FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
+    xamlLayer->SetValue(Canvas::ZIndexProperty, zIndex);
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 
 void LayerProxy::SetProperty(const wchar_t* name, float value) {
-    FrameworkElement^ xamlNode = _FrameworkElementFromInspectable(_xamlElement);
-    CoreAnimation::LayerProperties::SetValue(xamlNode, ref new Platform::String(name), (double)value);
+    FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
+    CoreAnimation::LayerProperties::SetValue(xamlLayer, ref new Platform::String(name), (double)value);
 }
 
 void LayerProxy::SetPropertyInt(const wchar_t* name, int value) {
-    FrameworkElement^ xamlNode = _FrameworkElementFromInspectable(_xamlElement);
-    CoreAnimation::LayerProperties::SetValue(xamlNode, ref new Platform::String(name), (int)value);
+    FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
+    CoreAnimation::LayerProperties::SetValue(xamlLayer, ref new Platform::String(name), (int)value);
 }
 
 void LayerProxy::SetHidden(bool hidden) {
-    FrameworkElement^ xamlNode = _FrameworkElementFromInspectable(_xamlElement);
-    xamlNode->Visibility = (hidden ? Visibility::Collapsed : Visibility::Visible);
+    FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
+    xamlLayer->Visibility = (hidden ? Visibility::Collapsed : Visibility::Visible);
 }
 
 void LayerProxy::SetMasksToBounds(bool masksToBounds) {
-    FrameworkElement^ xamlNode = _FrameworkElementFromInspectable(_xamlElement);
-    CoreAnimation::LayerProperties::SetValue(xamlNode, "masksToBounds", masksToBounds);
+    FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
+    CoreAnimation::LayerProperties::SetValue(xamlLayer, "masksToBounds", masksToBounds);
 }
 
 float LayerProxy::_GetPresentationPropertyValue(const char* name) {
-    FrameworkElement^ xamlNode = _FrameworkElementFromInspectable(_xamlElement);
+    FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
     std::string str(name);
     std::wstring wstr(str.begin(), str.end());
-    return (float)(double)CoreAnimation::LayerProperties::GetValue(xamlNode, ref new Platform::String(wstr.data()));
+    return (float)(double)CoreAnimation::LayerProperties::GetValue(xamlLayer, ref new Platform::String(wstr.data()));
 }
 
 void LayerProxy::SetContentsCenter(float x, float y, float width, float height) {
-    FrameworkElement^ xamlNode = _FrameworkElementFromInspectable(_xamlElement);
-    CoreAnimation::LayerProperties::SetContentCenter(xamlNode, Rect(x, y, width, height));
+    FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
+    CoreAnimation::LayerProperties::SetContentCenter(xamlLayer, Rect(x, y, width, height));
 }
 
 /////////////////////////////////////////////////////////////
 // TODO: FIND A WAY TO REMOVE THIS?
 void LayerProxy::SetTopMost() {
-    FrameworkElement^ xamlNode = _FrameworkElementFromInspectable(_xamlElement);
+    FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
     _topMost = true;
-    // xamlNode->SetTopMost();
+    // xamlLayer->SetTopMost();
     // Worst case, this becomes:
-    // xamlNode -> _SetContent(nullptr);
-    // xamlNode -> __super::Background = nullptr;
+    // xamlLayer -> _SetContent(nullptr);
+    // xamlLayer -> __super::Background = nullptr;
 }
 
 void LayerProxy::SetBackgroundColor(float r, float g, float b, float a) {
-    FrameworkElement^ xamlNode = _FrameworkElementFromInspectable(_xamlElement);
+    FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
 
     SolidColorBrush^ backgroundBrush = nullptr; // A null brush is transparent and not hit-testable
     if (!_isRoot && !_topMost && (a != 0.0)) {
@@ -147,109 +147,109 @@ void LayerProxy::SetBackgroundColor(float r, float g, float b, float a) {
     }
 
     // Panel and Control each have a Background property that we can set
-    if (Panel^ panel = dynamic_cast<Panel^>(xamlNode)) {
+    if (Panel^ panel = dynamic_cast<Panel^>(xamlLayer)) {
         panel->Background = backgroundBrush;
-    } else if (Control^ control = dynamic_cast<Control^>(xamlNode)) {
+    } else if (Control^ control = dynamic_cast<Control^>(xamlLayer)) {
         control->Background = backgroundBrush;
     } else {
         UNIMPLEMENTED_WITH_MSG(
             "SetBackgroundColor not supported on this Xaml element: [%ws].",
-            xamlNode->GetType()->FullName->Data());
+            xamlLayer->GetType()->FullName->Data());
     }
 }
 
 void LayerProxy::SetShouldRasterize(bool rasterize) {
-    FrameworkElement^ xamlNode = _FrameworkElementFromInspectable(_xamlElement);
+    FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
     if (rasterize) {
-        xamlNode->CacheMode = ref new Media::BitmapCache();
-    } else if (xamlNode->CacheMode) {
-        xamlNode->CacheMode = nullptr;
+        xamlLayer->CacheMode = ref new Media::BitmapCache();
+    } else if (xamlLayer->CacheMode) {
+        xamlLayer->CacheMode = nullptr;
     }
 }
 
 void LayerProxy::SetContents(const Microsoft::WRL::ComPtr<IInspectable>& bitmap, float width, float height, float scale) {
-    FrameworkElement^ xamlNode = _FrameworkElementFromInspectable(_xamlElement);
+    FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
     if (bitmap) {
         auto content = dynamic_cast<Media::ImageSource^>(reinterpret_cast<Platform::Object^>(bitmap.Get()));
-        CoreAnimation::LayerProperties::SetContent(xamlNode, content, width, height, scale);
+        CoreAnimation::LayerProperties::SetContent(xamlLayer, content, width, height, scale);
     } else {
-        CoreAnimation::LayerProperties::SetContent(xamlNode, nullptr, width, height, scale);
+        CoreAnimation::LayerProperties::SetContent(xamlLayer, nullptr, width, height, scale);
     }
 }
 
 void LayerProxy::AddToRoot() {
-    FrameworkElement^ xamlNode = _FrameworkElementFromInspectable(_xamlElement);
-    windowCollection->Children->Append(xamlNode);
+    FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
+    windowCollection->Children->Append(xamlLayer);
     SetMasksToBounds(true);
     _isRoot = true;
 }
 
-void LayerProxy::AddSubnode(const std::shared_ptr<LayerProxy>& subNode, const std::shared_ptr<LayerProxy>& before, const std::shared_ptr<LayerProxy>& after) {
-    assert(subNode->_parent == NULL);
-    subNode->_parent = this;
-    _subnodes.insert(subNode);
+void LayerProxy::AddSubLayer(const std::shared_ptr<LayerProxy>& subLayer, const std::shared_ptr<LayerProxy>& before, const std::shared_ptr<LayerProxy>& after) {
+    assert(subLayer->_parent == NULL);
+    subLayer->_parent = this;
+    _subLayers.insert(subLayer);
 
-    FrameworkElement^ xamlElementForSubNode = _FrameworkElementFromInspectable(subNode->_xamlElement);
-    Panel^ subLayerPanelForThisNode = _SubLayerPanelFromInspectable(_xamlElement);
-    if (!subLayerPanelForThisNode) {
+    FrameworkElement^ xamlElementForSubLayer = _FrameworkElementFromInspectable(subLayer->_xamlElement);
+    Panel^ subLayerPanelForThisLayer = _SubLayerPanelFromInspectable(_xamlElement);
+    if (!subLayerPanelForThisLayer) {
         UNIMPLEMENTED_WITH_MSG(
-            "AddSubNode not supported on this Xaml element: [%ws].", 
+            "AddSubLayer not supported on this Xaml element: [%ws].", 
             _FrameworkElementFromInspectable(_xamlElement)->GetType()->FullName->Data());
         return;
     }
 
     if (before == NULL && after == NULL) {
-        subLayerPanelForThisNode->Children->Append(xamlElementForSubNode);
+        subLayerPanelForThisLayer->Children->Append(xamlElementForSubLayer);
     } else if (before != NULL) {
-        FrameworkElement^ xamlBeforeNode = _FrameworkElementFromInspectable(before->_xamlElement);
+        FrameworkElement^ xamlBeforeLayer = _FrameworkElementFromInspectable(before->_xamlElement);
         unsigned int idx = 0;
-        if (subLayerPanelForThisNode->Children->IndexOf(xamlBeforeNode, &idx) == true) {
-            subLayerPanelForThisNode->Children->InsertAt(idx, xamlElementForSubNode);
+        if (subLayerPanelForThisLayer->Children->IndexOf(xamlBeforeLayer, &idx) == true) {
+            subLayerPanelForThisLayer->Children->InsertAt(idx, xamlElementForSubLayer);
         } else {
             FAIL_FAST();
         }
     } else if (after != NULL) {
-        FrameworkElement^ xamlAfterNode = _FrameworkElementFromInspectable(after->_xamlElement);
+        FrameworkElement^ xamlAfterLayer = _FrameworkElementFromInspectable(after->_xamlElement);
         unsigned int idx = 0;
-        if (subLayerPanelForThisNode->Children->IndexOf(xamlAfterNode, &idx) == true) {
-            subLayerPanelForThisNode->Children->InsertAt(idx + 1, xamlElementForSubNode);
+        if (subLayerPanelForThisLayer->Children->IndexOf(xamlAfterLayer, &idx) == true) {
+            subLayerPanelForThisLayer->Children->InsertAt(idx + 1, xamlElementForSubLayer);
         } else {
             FAIL_FAST();
         }
     }
 
-    subLayerPanelForThisNode->InvalidateArrange();
+    subLayerPanelForThisLayer->InvalidateArrange();
 }
 
-void LayerProxy::MoveNode(const std::shared_ptr<LayerProxy>& before, const std::shared_ptr<LayerProxy>& after) {
+void LayerProxy::MoveLayer(const std::shared_ptr<LayerProxy>& before, const std::shared_ptr<LayerProxy>& after) {
     assert(_parent != NULL);
 
-    FrameworkElement^ xamlElementForThisNode = _FrameworkElementFromInspectable(_xamlElement);
-    Panel^ subLayerPanelForParentNode = _SubLayerPanelFromInspectable(_parent->_xamlElement);
-    if (!subLayerPanelForParentNode) {
-        FrameworkElement^ xamlElementForParentNode = _FrameworkElementFromInspectable(_parent->_xamlElement);
+    FrameworkElement^ xamlElementForThisLayer = _FrameworkElementFromInspectable(_xamlElement);
+    Panel^ subLayerPanelForParentLayer = _SubLayerPanelFromInspectable(_parent->_xamlElement);
+    if (!subLayerPanelForParentLayer) {
+        FrameworkElement^ xamlElementForParentLayer = _FrameworkElementFromInspectable(_parent->_xamlElement);
         UNIMPLEMENTED_WITH_MSG(
-            "MoveNode for [%ws] not supported on parent [%ws].",
-            xamlElementForThisNode->GetType()->FullName->Data(),
-            xamlElementForParentNode->GetType()->FullName->Data());
+            "MoveLayer for [%ws] not supported on parent [%ws].",
+            xamlElementForThisLayer->GetType()->FullName->Data(),
+            xamlElementForParentLayer->GetType()->FullName->Data());
         return;
     }
 
     if (before != NULL) {
-        FrameworkElement^ xamlBeforeNode = _FrameworkElementFromInspectable(before->_xamlElement);
+        FrameworkElement^ xamlBeforeLayer = _FrameworkElementFromInspectable(before->_xamlElement);
 
         unsigned int srcIdx = 0;
-        if (subLayerPanelForParentNode->Children->IndexOf(xamlElementForThisNode, &srcIdx) == true) {
+        if (subLayerPanelForParentLayer->Children->IndexOf(xamlElementForThisLayer, &srcIdx) == true) {
             unsigned int destIdx = 0;
-            if (subLayerPanelForParentNode->Children->IndexOf(xamlBeforeNode, &destIdx) == true) {
+            if (subLayerPanelForParentLayer->Children->IndexOf(xamlBeforeLayer, &destIdx) == true) {
                 if (srcIdx == destIdx)
                     return;
 
                 if (srcIdx < destIdx)
                     destIdx--;
 
-                subLayerPanelForParentNode->Children->RemoveAt(srcIdx);
-                subLayerPanelForParentNode->Children->InsertAt(destIdx, xamlElementForThisNode);
+                subLayerPanelForParentLayer->Children->RemoveAt(srcIdx);
+                subLayerPanelForParentLayer->Children->InsertAt(destIdx, xamlElementForThisLayer);
             } else {
                 FAIL_FAST();
             }
@@ -259,19 +259,19 @@ void LayerProxy::MoveNode(const std::shared_ptr<LayerProxy>& before, const std::
     } else {
         assert(after != NULL);
 
-        FrameworkElement^ xamlAfterNode = _FrameworkElementFromInspectable(after->_xamlElement);
+        FrameworkElement^ xamlAfterLayer = _FrameworkElementFromInspectable(after->_xamlElement);
         unsigned int srcIdx = 0;
-        if (subLayerPanelForParentNode->Children->IndexOf(xamlElementForThisNode, &srcIdx) == true) {
+        if (subLayerPanelForParentLayer->Children->IndexOf(xamlElementForThisLayer, &srcIdx) == true) {
             unsigned int destIdx = 0;
-            if (subLayerPanelForParentNode->Children->IndexOf(xamlAfterNode, &destIdx) == true) {
+            if (subLayerPanelForParentLayer->Children->IndexOf(xamlAfterLayer, &destIdx) == true) {
                 if (srcIdx == destIdx)
                     return;
 
                 if (srcIdx < destIdx)
                     destIdx--;
 
-                subLayerPanelForParentNode->Children->RemoveAt(srcIdx);
-                subLayerPanelForParentNode->Children->InsertAt(destIdx + 1, xamlElementForThisNode);
+                subLayerPanelForParentLayer->Children->RemoveAt(srcIdx);
+                subLayerPanelForParentLayer->Children->InsertAt(destIdx + 1, xamlElementForThisLayer);
             } else {
                 FAIL_FAST();
             }
@@ -281,26 +281,26 @@ void LayerProxy::MoveNode(const std::shared_ptr<LayerProxy>& before, const std::
     }
 }
 
-void LayerProxy::RemoveFromSupernode() {
-    FrameworkElement^ xamlElementForThisNode = _FrameworkElementFromInspectable(_xamlElement);
-    Panel^ subLayerPanelForParentNode;
+void LayerProxy::RemoveFromSuperLayer() {
+    FrameworkElement^ xamlElementForThisLayer = _FrameworkElementFromInspectable(_xamlElement);
+    Panel^ subLayerPanelForParentLayer;
     if (_isRoot) {
-        subLayerPanelForParentNode = (Panel^)(Platform::Object^)windowCollection;
+        subLayerPanelForParentLayer = (Panel^)(Platform::Object^)windowCollection;
     } else {
         if (!_parent) {
             return;
         }
 
-        subLayerPanelForParentNode = _SubLayerPanelFromInspectable(_parent->_xamlElement);
-        _parent->_subnodes.erase(shared_from_this());
+        subLayerPanelForParentLayer = _SubLayerPanelFromInspectable(_parent->_xamlElement);
+        _parent->_subLayers.erase(shared_from_this());
     }
 
-    if (!subLayerPanelForParentNode) {
-        FrameworkElement^ xamlElementForParentNode = _FrameworkElementFromInspectable(_parent->_xamlElement);
+    if (!subLayerPanelForParentLayer) {
+        FrameworkElement^ xamlElementForParentLayer = _FrameworkElementFromInspectable(_parent->_xamlElement);
         UNIMPLEMENTED_WITH_MSG(
-            "RemoveFromSupernode for [%ws] not supported on parent [%ws].",
-            xamlElementForThisNode->GetType()->FullName->Data(),
-            xamlElementForParentNode->GetType()->FullName->Data());
+            "RemoveFromSuperLayer for [%ws] not supported on parent [%ws].",
+            xamlElementForThisLayer->GetType()->FullName->Data(),
+            xamlElementForParentLayer->GetType()->FullName->Data());
 
         return;
     }
@@ -308,8 +308,8 @@ void LayerProxy::RemoveFromSupernode() {
     _parent = nullptr;
 
     unsigned int idx = 0;
-    if (subLayerPanelForParentNode->Children->IndexOf(xamlElementForThisNode, &idx) == true) {
-        subLayerPanelForParentNode->Children->RemoveAt(idx);
+    if (subLayerPanelForParentLayer->Children->IndexOf(xamlElementForThisLayer, &idx) == true) {
+        subLayerPanelForParentLayer->Children->RemoveAt(idx);
     } else {
         FAIL_FAST();
     }

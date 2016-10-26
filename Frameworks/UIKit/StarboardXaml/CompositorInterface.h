@@ -22,18 +22,6 @@
 #include "winobjc\winobjc.h"
 #include <ppltasks.h>
 
-/////////////////////////////////////////////////////////////////////////////////////////////
-// TODO: MOVE TO OWN FILE; MAYBE WITH THE OTHER BITMAP MANAGEMENT STUFF
-class DisplayTexture {
-public:
-    virtual ~DisplayTexture(){};
-    virtual const Microsoft::WRL::ComPtr<IInspectable>& GetContent() const = 0;
-
-protected:
-    Microsoft::WRL::ComPtr<IInspectable> _xamlImage;
-};
-/////////////////////////////////////////////////////////////////////////////////////////////
-
 typedef enum {
     CompositionModeDefault = 0,
     CompositionModeLibrary = 1,

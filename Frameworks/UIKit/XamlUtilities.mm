@@ -14,7 +14,7 @@
 //
 //******************************************************************************
 #import "XamlUtilities.h"
-#import "CACompositor.h"
+#import "StarboardXaml/DisplayTexture.h"
 
 // TOOD: Bug 8706843:Constructor or Helper to create FontFamily isn't projected - thus no way to create a FontFamily from Objective C side.
 // remove this once 8706843 is resolved
@@ -70,7 +70,7 @@ WUXMImageBrush* ConvertUIImageToWUXMImageBrush(UIImage* image) {
     }
 
     CGImageRef cgImg = [image CGImage];
-    Microsoft::WRL::ComPtr<IInspectable> inspectableNode(GetCACompositor()->GetBitmapForCGImage(cgImg));
+    Microsoft::WRL::ComPtr<IInspectable> inspectableNode(DisplayTexture::GetBitmapForCGImage(cgImg));
     WUXMIBitmapSource* bitmapImageSource = CreateRtProxy([WUXMIBitmapSource class], inspectableNode.Get());
     WUXMImageBrush* imageBrush = [WUXMImageBrush make];
     imageBrush.imageSource = bitmapImageSource;
@@ -84,7 +84,7 @@ WUXMIBitmapSource* ConvertUIImageToWUXMIBitmapSource(UIImage* image) {
     }
 
     CGImageRef cgImg = [image CGImage];
-    Microsoft::WRL::ComPtr<IInspectable> inspectableNode(GetCACompositor()->GetBitmapForCGImage(cgImg));
+    Microsoft::WRL::ComPtr<IInspectable> inspectableNode(DisplayTexture::GetBitmapForCGImage(cgImg));
     WUXMIBitmapSource* bitmapImageSource = CreateRtProxy([WUXMIBitmapSource class], inspectableNode.Get());
 
     return bitmapImageSource;

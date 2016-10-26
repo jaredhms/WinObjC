@@ -46,13 +46,13 @@
 #import <LoggingNative.h>
 #import "StringHelpers.h"
 #import <MainDispatcher.h>
-#import "CoreGraphics/CGImage.h"
 
 #import <UWP/WindowsUIViewManagement.h>
 #import <UWP/WindowsDevicesInput.h>
 #import "UIColorInternal.h"
 
 #import "DisplayProperties.h"
+#import "DisplayTexture.h"
 #import "LayerAnimation.h"
 #import "LayerProxy.h"
 #import "LayerTransaction.h"
@@ -67,201 +67,15 @@ static const wchar_t* TAG = L"CompositorInterface";
 
 CompositionMode g_compositionMode = CompositionModeDefault;
 
-/////////////////////////////////////////////////////////////////////////////////////////////////
-// TODO: MOVE TO BITMAP MANAGMENT API
-ComPtr<IInspectable> CreateBitmapFromBits(void* ptr, int width, int height, int stride);
-ComPtr<IInspectable> CreateBitmapFromImageData(const void* ptr, int len);
-ComPtr<IInspectable> CreateWritableBitmap(int width, int height);
-ComPtr<IInspectable> LockWritableBitmap(const ComPtr<IInspectable>& bitmap, void** ptr, int* stride);
-/////////////////////////////////////////////////////////////////////////////////////////////////
-
 void SetRootGrid(winobjc::Id& root);
 
-/////////////////////////////////////////////////////////////////////////////////////////////////
-// TODO: MOVE TO DisplayLink API
+// TODO: Move to a displaylink helper API?
 void EnableRenderingListener(void (*callback)());
 void DisableRenderingListener();
 
 void OnRenderedFrame() {
     CASignalDisplayLink();
 }
-/////////////////////////////////////////////////////////////////////////////////////////////////
-
-std::mutex _displayTextureCacheLock;
-std::map<CGImageRef, std::shared_ptr<DisplayTexture>> _displayTextureCache;
-
-std::shared_ptr<DisplayTexture> CachedDisplayTextureForImage(CGImageRef img) {
-    std::shared_ptr<DisplayTexture> ret;
-    _displayTextureCacheLock.lock();
-    auto cachedEntry = _displayTextureCache.find(img);
-    if (cachedEntry != _displayTextureCache.end()) {
-        ret = cachedEntry->second;
-    }
-    _displayTextureCacheLock.unlock();
-
-    return ret;
-}
-
-void SetCachedDisplayTextureForImage(CGImageRef img, const std::shared_ptr<DisplayTexture>& texture) {
-    _displayTextureCacheLock.lock();
-    if (!texture) {
-        // Clear the cache if the texture is nullptr
-        _displayTextureCache.erase(img);
-    } else {
-        // Cache the texture
-        _displayTextureCache[img] = texture;
-    }
-    _displayTextureCacheLock.unlock();
-}
-
-void UIReleaseDisplayTextureForCGImage(CGImageRef img) {
-    SetCachedDisplayTextureForImage(img, nullptr);
-}
-
-class DisplayTextureContent : public DisplayTexture {
-public:
-    DisplayTextureContent(CGImageRef img) {
-        if (img->_imgType == CGImageTypePNG || img->_imgType == CGImageTypeJPEG) {
-            const void* data = NULL;
-            bool freeData = false;
-            int len = 0;
-
-            switch (img->_imgType) {
-                case CGImageTypePNG: {
-                    CGPNGImageBacking* pngImg = (CGPNGImageBacking*)img->Backing();
-
-                    if (pngImg->_fileName) {
-                        EbrFile* fpIn;
-                        fpIn = EbrFopen(pngImg->_fileName, "rb");
-                        if (!fpIn) {
-                            FAIL_FAST();
-                        }
-                        EbrFseek(fpIn, 0, SEEK_END);
-                        int fileLen = EbrFtell(fpIn);
-                        EbrFseek(fpIn, 0, SEEK_SET);
-                        void* pngData = (void*)IwMalloc(fileLen);
-                        len = EbrFread(pngData, 1, fileLen, fpIn);
-                        EbrFclose(fpIn);
-
-                        data = pngData;
-                        freeData = true;
-                    } else {
-                        data = [(NSData*)pngImg->_data bytes];
-                        len = [(NSData*)pngImg->_data length];
-                    }
-                } break;
-
-                case CGImageTypeJPEG: {
-                    CGJPEGImageBacking* jpgImg = (CGJPEGImageBacking*)img->Backing();
-
-                    if (jpgImg->_fileName) {
-                        EbrFile* fpIn;
-                        fpIn = EbrFopen(jpgImg->_fileName, "rb");
-                        if (!fpIn) {
-                            FAIL_FAST();
-                        }
-                        EbrFseek(fpIn, 0, SEEK_END);
-                        int fileLen = EbrFtell(fpIn);
-                        EbrFseek(fpIn, 0, SEEK_SET);
-                        void* imgData = (void*)IwMalloc(fileLen);
-                        len = EbrFread(imgData, 1, fileLen, fpIn);
-                        EbrFclose(fpIn);
-
-                        data = imgData;
-                        freeData = true;
-                    } else {
-                        data = [(NSData*)jpgImg->_data bytes];
-                        len = [(NSData*)jpgImg->_data length];
-                    }
-                } break;
-                default:
-                    TraceError(TAG, L"Warning: unrecognized image format sent to DisplayTextureContent!");
-                    break;
-            }
-            _xamlImage = CreateBitmapFromImageData(data, len);
-            if (freeData) {
-                IwFree((void*)data);
-            }
-            return;
-        }
-
-        int texWidth = img->Backing()->Width();
-        int texHeight = img->Backing()->Height();
-        int imageWidth = texWidth;
-        int imageHeight = texHeight;
-        int imageX = 0;
-        int imageY = 0;
-        CGImageRef pNewImage = 0;
-        CGImageRef pTexImage = img;
-
-        bool matched = false;
-        if (img->Backing()->SurfaceFormat() == _ColorARGB) {
-            matched = true;
-        }
-
-        // Unrecognized, make 8888 ARGB:
-        if (!matched) {
-            CGContextRef ctx = _CGBitmapContextCreateWithFormat(texWidth, texHeight, _ColorARGB);
-
-            pNewImage = CGBitmapContextGetImage(ctx);
-            CGImageRetain(pNewImage);
-
-            pTexImage = pNewImage;
-
-            CGRect rect, destRect;
-
-            int w = fmin(imageWidth, texWidth), h = fmin(imageHeight, texHeight);
-
-            rect.origin.x = float(imageX);
-            rect.origin.y = float(imageY);
-            rect.size.width = float(w);
-            rect.size.height = float(h);
-
-            destRect.origin.x = 0;
-            destRect.origin.y = float(texHeight - imageHeight);
-            destRect.size.width = float(w);
-            destRect.size.height = float(h);
-
-            CGContextDrawImageRect(ctx, img, rect, destRect);
-            CGContextRelease(ctx);
-        }
-
-        void* data = (void*)pTexImage->Backing()->LockImageData();
-        int bytesPerRow = pTexImage->Backing()->BytesPerRow();
-
-        int width = pTexImage->Backing()->Width();
-        int height = pTexImage->Backing()->Height();
-
-        _xamlImage = CreateBitmapFromBits(data, width, height, bytesPerRow);
-
-        pTexImage->Backing()->ReleaseImageData();
-        img->Backing()->DiscardIfPossible();
-
-        CGImageRelease(pNewImage);
-    }
-
-    DisplayTextureContent(int width, int height) {
-        _xamlImage = CreateWritableBitmap(width, height);
-    }
-
-    void* LockWritableBitmap(int* stride) {
-        void* ret = nullptr;
-        _lockPtr = ::LockWritableBitmap(_xamlImage, &ret, stride);
-        return ret;
-    }
-
-    void UnlockWritableBitmap() {
-        // Release our _lockPtr to unlock the bitmap
-        _lockPtr.Reset();
-    }
-
-    const ComPtr<IInspectable>& GetContent() const {
-        return _xamlImage;
-    }
-
-private:
-    Microsoft::WRL::ComPtr<IInspectable> _lockPtr;
-};
 
 std::deque<std::shared_ptr<ICompositorTransaction>> s_queuedTransactions;
 
@@ -318,47 +132,16 @@ public:
         return LayerAnimation::CreateTransitionAnimation(animation, type, subType);
     }
 
-    virtual std::shared_ptr<DisplayTexture> GetDisplayTextureForCGImage(CGImageRef img, bool create) override {
-        CGImageRetain(img);
-        auto cleanup = wil::ScopeExit([img] {
-            CGImageRelease(img);
-        });
-
-        // If the image has a backing texture, use it
-        std::shared_ptr<DisplayTexture> texture = img->Backing()->GetDisplayTexture();
-        if (texture) {
-            return texture;
-        }
-
-        // If we have a cached texture for this image, use it
-        texture = CachedDisplayTextureForImage(img);
-        if (texture) {
-            return texture;
-        }
-
-        // Else, create and cache a new texture
-        texture = std::make_shared<DisplayTextureContent>(img);
-        SetCachedDisplayTextureForImage(img, texture);
-        return texture;
+    // DisplayTexture support
+    std::shared_ptr<IDisplayTexture> CreateDisplayTexture(int width, int height) override {
+        return std::make_shared<DisplayTexture>(width, height);
     }
 
-    virtual ComPtr<IInspectable> GetBitmapForCGImage(CGImageRef img) override {
-        auto content = std::make_unique<DisplayTextureContent>(img);
-        return content->GetContent();
+    virtual std::shared_ptr<IDisplayTexture> GetDisplayTextureForCGImage(CGImageRef img) override {
+        return DisplayTexture::GetForCGImage(img);
     }
 
-    std::shared_ptr<DisplayTexture> CreateWritableBitmapTexture32(int width, int height) override {
-        return std::make_shared<DisplayTextureContent>(width, height);
-    }
-
-    void* LockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& tex, int* stride) override {
-        return reinterpret_cast<DisplayTextureContent*>(tex.get())->LockWritableBitmap(stride);
-    }
-
-    void UnlockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& tex) override {
-        reinterpret_cast<DisplayTextureContent*>(tex.get())->UnlockWritableBitmap();
-    }
-
+    // DisplayLink support
     void EnableDisplaySyncNotification() override {
         EnableRenderingListener(OnRenderedFrame);
     }
@@ -367,6 +150,10 @@ public:
         DisableRenderingListener();
     }
 };
+
+void UIReleaseDisplayTextureForCGImage(CGImageRef img) {
+    DisplayTexture::ClearCacheForCGImage(img);
+}
 
 void CreateXamlCompositor(winobjc::Id& root, CompositionMode compositionMode) {
     g_compositionMode = compositionMode;

@@ -50,7 +50,7 @@ public:
     void Stop();
 
     // TODO: CAN WE DO const ILayerProxy&????
-    virtual concurrency::task<void> AddToNode(ILayerProxy& node) = 0;
+    virtual concurrency::task<void> AddToLayer(ILayerProxy& layer) = 0;
 
 protected:
     LayerAnimation();
@@ -62,9 +62,9 @@ protected:
 
     // TODO: CAN WE DO const ILayerProxy&????
     concurrency::task<void> _AddAnimation(
-        ILayerProxy& node, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to);
+        ILayerProxy& layer, const wchar_t* propertyName, bool fromValid, float from, bool toValid, float to);
     // TODO: CAN WE DO const ILayerProxy&????
-    concurrency::task<void> _AddTransitionAnimation(ILayerProxy& node, const char* type, const char* subtype);
+    concurrency::task<void> _AddTransitionAnimation(ILayerProxy& layer, const char* type, const char* subtype);
 
     // TODO: SWITCH TO COMPTR?
     Microsoft::WRL::ComPtr<IInspectable> _xamlAnimation;

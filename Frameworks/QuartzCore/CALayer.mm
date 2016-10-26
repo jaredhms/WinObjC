@@ -189,7 +189,7 @@ static void DoDisplayList(CALayer* layer) {
             }
         }
 
-        std::shared_ptr<DisplayTexture> newTexture = [cur->self _getDisplayTexture];
+        std::shared_ptr<IDisplayTexture> newTexture = [cur->self _getDisplayTexture];
         cur->needsDisplay = FALSE;
         if (newTexture) {
             [CATransaction _currentLayerTransaction]->SetLayerTexture(
@@ -292,22 +292,10 @@ CAPrivateInfo::~CAPrivateInfo() {
     }
 }
 
-class LockingBufferInterface : public DisplayTextureLocking {
-public:
-    void* LockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& texture, int* stride) {
-        return GetCACompositor()->LockWritableBitmapTexture(texture, stride);
-    }
-    void UnlockWritableBitmapTexture(const std::shared_ptr<DisplayTexture>& texture) {
-        GetCACompositor()->UnlockWritableBitmapTexture(texture);
-    }
-};
-
-static LockingBufferInterface _globallockingBufferInterface;
-
 CGContextRef CreateLayerContentsBitmapContext32(int width, int height) {
     if ([NSThread isMainThread]) {
-        std::shared_ptr<DisplayTexture> texture = GetCACompositor()->CreateWritableBitmapTexture32(width, height);
-        return _CGBitmapContextCreateWithTexture(width, height, texture, &_globallockingBufferInterface);
+        std::shared_ptr<IDisplayTexture> texture = GetCACompositor()->CreateDisplayTexture(width, height);
+        return _CGBitmapContextCreateWithTexture(width, height, texture);
     }
 
     return nil;
@@ -1843,13 +1831,13 @@ static void doRecursiveAction(CALayer* layer, NSString* actionName) {
     return nil;
 }
 
-- (std::shared_ptr<DisplayTexture>)_getDisplayTexture {
+- (std::shared_ptr<IDisplayTexture>)_getDisplayTexture {
     //  Update if needed
     [self displayIfNeeded];
 
     //  Create and return a texture if we have contents
     if (priv->contents) {
-        return GetCACompositor()->GetDisplayTextureForCGImage(priv->contents, true);
+        return GetCACompositor()->GetDisplayTextureForCGImage(priv->contents);
     }
 
     return nullptr;
