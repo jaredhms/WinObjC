@@ -21,7 +21,7 @@
 #include <memory>
 #include <set>
 
-// A LayerProxy is CALayer's proxy to its backing Xaml FrameworkElement.  
+// A LayerProxy is CALayer's proxy to its backing Xaml FrameworkElement.
 // LayerProxy is used to update the Xaml FrameworkElement's visual state (positioning, animations, etc.) based upon CALayer API calls,
 // and it's also responsible for the CALayer's sublayer management (*if* that backing Xaml FrameworkElement supports sublayers).
 // When constructed, the LayerProxy inspects the passed-in Xaml FrameworkElement, and lights up all CALayer functionality that's
@@ -62,8 +62,8 @@ public:
     // Sublayer management
     void AddToRoot();
     void AddSubLayer(const std::shared_ptr<LayerProxy>& subLayer,
-                    const std::shared_ptr<LayerProxy>& before,
-                    const std::shared_ptr<LayerProxy>& after);
+                     const std::shared_ptr<LayerProxy>& before,
+                     const std::shared_ptr<LayerProxy>& after);
     void MoveLayer(const std::shared_ptr<LayerProxy>& before, const std::shared_ptr<LayerProxy>& after);
     void RemoveFromSuperLayer();
 

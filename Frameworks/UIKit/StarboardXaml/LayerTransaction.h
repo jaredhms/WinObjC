@@ -38,24 +38,22 @@ class LayerTransaction : public ILayerTransaction, public ICompositorTransaction
 public:
     // ILayerTransaction sublayer management
     void AddLayer(const std::shared_ptr<ILayerProxy>& layer,
-        const std::shared_ptr<ILayerProxy>& superLayer,
-        const std::shared_ptr<ILayerProxy>& beforeLayer,
-        const std::shared_ptr<ILayerProxy>& afterLayer) override;
+                  const std::shared_ptr<ILayerProxy>& superLayer,
+                  const std::shared_ptr<ILayerProxy>& beforeLayer,
+                  const std::shared_ptr<ILayerProxy>& afterLayer) override;
     void MoveLayer(const std::shared_ptr<ILayerProxy>& layer,
-        const std::shared_ptr<ILayerProxy>& beforeLayer,
-        const std::shared_ptr<ILayerProxy>& afterLayer) override;
+                   const std::shared_ptr<ILayerProxy>& beforeLayer,
+                   const std::shared_ptr<ILayerProxy>& afterLayer) override;
     void RemoveLayer(const std::shared_ptr<ILayerProxy>& layer) override;
 
     // ILayerTransaction property management
-    void SetLayerProperty(const std::shared_ptr<ILayerProxy>& layer,
-        const char* propertyName,
-        NSObject* newValue) override;
+    void SetLayerProperty(const std::shared_ptr<ILayerProxy>& layer, const char* propertyName, NSObject* newValue) override;
 
     // ILayerTransaction display management
     void SetLayerTexture(const std::shared_ptr<ILayerProxy>& layer,
-        const std::shared_ptr<IDisplayTexture>& newTexture,
-        CGSize contentsSize,
-        float contentsScale) override;
+                         const std::shared_ptr<IDisplayTexture>& newTexture,
+                         CGSize contentsSize,
+                         float contentsScale) override;
 
     // ILayerTransaction animation management
     void AddAnimation(CALayer* layer, CAAnimation* animation, NSString* forKey) override;

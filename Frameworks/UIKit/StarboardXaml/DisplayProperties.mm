@@ -87,8 +87,7 @@ float ScreenScale() {
             for (int i = 0; i < [pointerDevices count]; i++) {
                 WFRect* screenRect = [(WDIPointerDevice*)[pointerDevices objectAtIndex:i] screenRect];
                 float hostScreenScale = [UIApplication displayMode].hostScreenScale;
-                maxDimension =
-                    std::max(maxDimension, std::max(screenRect.width * hostScreenScale, screenRect.height * hostScreenScale));
+                maxDimension = std::max(maxDimension, std::max(screenRect.width * hostScreenScale, screenRect.height * hostScreenScale));
             }
 
             // We can't know whether the app will be rotated, or moved from screen to screen. We have to take the
@@ -162,5 +161,4 @@ void SetDeviceSize(int width, int height) {
     s_deviceWidth = width;
     s_deviceHeight = height;
 }
-
 }

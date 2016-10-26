@@ -58,10 +58,10 @@ public:
     void _Completed() {
         id animHandler = _animHandler; // Save in a local for the block to retain.
         dispatch_async(dispatch_get_main_queue(),
-            ^{
-            [animHandler animationDidStop : TRUE];
-        [animHandler _removeAnimationsFromLayer];
-        });
+                       ^{
+                           [animHandler animationDidStop:TRUE];
+                           [animHandler _removeAnimationsFromLayer];
+                       });
     }
 };
 
@@ -407,11 +407,11 @@ public:
     }
 
     BasicAnimation(id animHandler,
-                          NSString* propertyName,
-                          NSObject* fromValue,
-                          NSObject* toValue,
-                          NSObject* byValue,
-                          CAMediaTimingProperties* timingProperties) {
+                   NSString* propertyName,
+                   NSObject* fromValue,
+                   NSObject* toValue,
+                   NSObject* byValue,
+                   CAMediaTimingProperties* timingProperties) {
         CAMediaTimingFunction* mediaTiming = timingProperties->_timingFunction;
         float p1[2] = { 0 }, p2[2] = { 0 };
         [mediaTiming getControlPointAtIndex:0 values:p1];
@@ -567,22 +567,17 @@ public:
         return concurrency::task_from_result();
     }
 };
-
 }
 
-std::shared_ptr<ILayerAnimation> LayerAnimation::CreateBasicAnimation(
-    CAAnimation* animation,
-    NSString* propertyName,
-    NSObject* fromValue,
-    NSObject* toValue,
-    NSObject* byValue,
-    CAMediaTimingProperties* timingProperties) {
+std::shared_ptr<ILayerAnimation> LayerAnimation::CreateBasicAnimation(CAAnimation* animation,
+                                                                      NSString* propertyName,
+                                                                      NSObject* fromValue,
+                                                                      NSObject* toValue,
+                                                                      NSObject* byValue,
+                                                                      CAMediaTimingProperties* timingProperties) {
     return std::make_shared<BasicAnimation>(animation, propertyName, fromValue, toValue, byValue, timingProperties);
 }
 
-std::shared_ptr<ILayerAnimation> LayerAnimation::CreateTransitionAnimation(
-    CAAnimation* animation,
-    NSString* type,
-    NSString* subType) {
+std::shared_ptr<ILayerAnimation> LayerAnimation::CreateTransitionAnimation(CAAnimation* animation, NSString* type, NSString* subType) {
     return std::make_shared<TransitionAnimation>(animation, type, subType);
 }

@@ -63,7 +63,6 @@ void SetCachedDisplayTextureForImage(CGImageRef img, const std::shared_ptr<IDisp
     }
     _displayTextureCacheLock.unlock();
 }
-
 }
 
 DisplayTexture::DisplayTexture(int width, int height) {
@@ -72,9 +71,7 @@ DisplayTexture::DisplayTexture(int width, int height) {
 
 std::shared_ptr<IDisplayTexture> DisplayTexture::GetForCGImage(CGImageRef img) {
     CGImageRetain(img);
-    auto cleanup = wil::ScopeExit([img] {
-        CGImageRelease(img);
-    });
+    auto cleanup = wil::ScopeExit([img] { CGImageRelease(img); });
 
     // If the image has a backing texture, use it
     std::shared_ptr<IDisplayTexture> texture = img->Backing()->GetDisplayTexture();

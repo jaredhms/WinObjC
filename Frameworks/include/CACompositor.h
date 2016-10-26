@@ -40,7 +40,8 @@
 // Proxy between CALayer and its Xaml representation
 struct ILayerProxy {
 public:
-    virtual ~ILayerProxy() {}
+    virtual ~ILayerProxy() {
+    }
 
     virtual Microsoft::WRL::ComPtr<IInspectable> GetXamlElement() = 0;
     virtual void* GetPropertyValue(const char* propertyName) = 0;
@@ -53,13 +54,15 @@ public:
 // Proxy between CAAnimation and its Xaml representation
 struct ILayerAnimation {
 public:
-    virtual ~ILayerAnimation() {}
+    virtual ~ILayerAnimation() {
+    }
 };
 
 // Proxy for CG-rendered content
 struct IDisplayTexture {
 public:
-    virtual ~IDisplayTexture() {}
+    virtual ~IDisplayTexture() {
+    }
 
     virtual Microsoft::WRL::ComPtr<IInspectable> GetContent() = 0;
     virtual void* Lock(int* stride) = 0;
@@ -71,28 +74,27 @@ public:
 // Proxy between CATransaction and its backing implementation
 struct ILayerTransaction {
 public:
-    virtual ~ILayerTransaction() {}
+    virtual ~ILayerTransaction() {
+    }
 
     // Sublayer management
     virtual void AddLayer(const std::shared_ptr<ILayerProxy>& layer,
-                         const std::shared_ptr<ILayerProxy>& superLayer,
-                         const std::shared_ptr<ILayerProxy>& beforeLayer,
-                         const std::shared_ptr<ILayerProxy>& afterLayer) = 0;
-    virtual void MoveLayer(const std::shared_ptr<ILayerProxy>& layer,
+                          const std::shared_ptr<ILayerProxy>& superLayer,
                           const std::shared_ptr<ILayerProxy>& beforeLayer,
                           const std::shared_ptr<ILayerProxy>& afterLayer) = 0;
+    virtual void MoveLayer(const std::shared_ptr<ILayerProxy>& layer,
+                           const std::shared_ptr<ILayerProxy>& beforeLayer,
+                           const std::shared_ptr<ILayerProxy>& afterLayer) = 0;
     virtual void RemoveLayer(const std::shared_ptr<ILayerProxy>& layer) = 0;
 
     // Property management
-    virtual void SetLayerProperty(const std::shared_ptr<ILayerProxy>& layer,
-                                  const char* propertyName,
-                                  NSObject* newValue) = 0;
+    virtual void SetLayerProperty(const std::shared_ptr<ILayerProxy>& layer, const char* propertyName, NSObject* newValue) = 0;
 
     // Display management
     virtual void SetLayerTexture(const std::shared_ptr<ILayerProxy>& layer,
-                                const std::shared_ptr<IDisplayTexture>& newTexture,
-                                CGSize contentsSize,
-                                float contentsScale) = 0;
+                                 const std::shared_ptr<IDisplayTexture>& newTexture,
+                                 CGSize contentsSize,
+                                 float contentsScale) = 0;
 
     // Animation management
     virtual void AddAnimation(CALayer* layer, CAAnimation* animation, NSString* forKey) = 0;
@@ -115,7 +117,7 @@ public:
     // CATransaction support
     virtual std::shared_ptr<ILayerTransaction> CreateLayerTransaction() = 0;
     virtual void QueueLayerTransaction(const std::shared_ptr<ILayerTransaction>& transaction,
-                                         const std::shared_ptr<ILayerTransaction>& onTransaction) = 0;
+                                       const std::shared_ptr<ILayerTransaction>& onTransaction) = 0;
     virtual void ProcessLayerTransactions() = 0;
 
     // CALayer support
@@ -123,14 +125,12 @@ public:
 
     // CAAnimation support
     virtual std::shared_ptr<ILayerAnimation> CreateBasicAnimation(CAAnimation* animation,
-                                                                 NSString* propertyName,
-                                                                 NSObject* fromValue,
-                                                                 NSObject* toValue,
-                                                                 NSObject* byValue,
-                                                                 CAMediaTimingProperties* timingProperties) = 0;
-    virtual std::shared_ptr<ILayerAnimation> CreateTransitionAnimation(CAAnimation* animation,
-                                                                      NSString* type,
-                                                                      NSString* subtype) = 0;
+                                                                  NSString* propertyName,
+                                                                  NSObject* fromValue,
+                                                                  NSObject* toValue,
+                                                                  NSObject* byValue,
+                                                                  CAMediaTimingProperties* timingProperties) = 0;
+    virtual std::shared_ptr<ILayerAnimation> CreateTransitionAnimation(CAAnimation* animation, NSString* type, NSString* subtype) = 0;
 
     // DisplayTexture support
     virtual std::shared_ptr<IDisplayTexture> CreateDisplayTexture(int width, int height) = 0;

@@ -82,8 +82,7 @@ NSString* const kCATransitionFromBottom = @"kCATransitionFromBottom";
 
 - (std::shared_ptr<ILayerAnimation>)_createAnimation:(CALayer*)layer forKey:(NSString*)key {
     _attachedLayer = layer;
-    _runningAnimation =
-        _globalCompositor->CreateTransitionAnimation(self, _type, _subtype);
+    _runningAnimation = _globalCompositor->CreateTransitionAnimation(self, _type, _subtype);
 
     return _runningAnimation;
 }

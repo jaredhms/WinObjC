@@ -52,8 +52,7 @@ CGGraphicBufferImage::CGGraphicBufferImage(const __CGSurfaceInfo& surfaceInfo) {
     _img->_parent = this;
 }
 
-CGGraphicBufferImage::CGGraphicBufferImage(const __CGSurfaceInfo& surfaceInfo,
-                                           const std::shared_ptr<IDisplayTexture>& nativeTexture) {
+CGGraphicBufferImage::CGGraphicBufferImage(const __CGSurfaceInfo& surfaceInfo, const std::shared_ptr<IDisplayTexture>& nativeTexture) {
     _img = new CGGraphicBufferImageBacking(surfaceInfo, nativeTexture);
     _imgType = CGImageTypeGraphicBuffer;
     _img->_parent = this;

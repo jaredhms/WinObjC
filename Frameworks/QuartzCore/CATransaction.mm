@@ -106,7 +106,7 @@ __declspec(thread) CATransaction* _curTransaction, *_rootTransaction;
     while (_curTransaction) {
         [self commit];
     }
-    
+
     if (_rootTransaction != NULL) {
         GetCACompositor()->QueueLayerTransaction(_rootTransaction->_transactionQueue, NULL);
         [_rootTransaction release];
@@ -196,10 +196,7 @@ __declspec(thread) CATransaction* _curTransaction, *_rootTransaction;
 }
 
 + (void)_setPropertyForLayer:(CALayer*)layer name:(NSString*)propertyName value:(NSObject*)newValue {
-    [self _currentLayerTransaction]->SetLayerProperty(
-                                          [layer _layerProxy],
-                                          [propertyName UTF8String],
-                                          newValue);
+    [self _currentLayerTransaction]->SetLayerProperty([layer _layerProxy], [propertyName UTF8String], newValue);
     [layer _displayChanged];
 }
 
@@ -212,43 +209,26 @@ __declspec(thread) CATransaction* _curTransaction, *_rootTransaction;
 }
 
 + (void)_addSublayerToLayer:(CALayer*)layer sublayer:(CALayer*)sublayer {
-    [self _currentLayerTransaction]->AddLayer(
-                               [sublayer _layerProxy],
-                               [layer _layerProxy],
-                               nullptr,
-                               nullptr);
+    [self _currentLayerTransaction]->AddLayer([sublayer _layerProxy], [layer _layerProxy], nullptr, nullptr);
 }
 
 + (void)_addSublayerToLayer:(CALayer*)layer sublayer:(CALayer*)sublayer before:(CALayer*)before {
-    [self _currentLayerTransaction]->AddLayer(
-                               [sublayer _layerProxy],
-                               [layer _layerProxy],
-                               [before _layerProxy],
-                               nullptr);
+    [self _currentLayerTransaction]->AddLayer([sublayer _layerProxy], [layer _layerProxy], [before _layerProxy], nullptr);
 }
 
 + (void)_addSublayerToLayer:(CALayer*)layer sublayer:(CALayer*)sublayer after:(CALayer*)after {
-    [self _currentLayerTransaction]->AddLayer(
-                               [sublayer _layerProxy],
-                               [layer _layerProxy],
-                               nullptr,
-                               [after _layerProxy]);
+    [self _currentLayerTransaction]->AddLayer([sublayer _layerProxy], [layer _layerProxy], nullptr, [after _layerProxy]);
 }
 
 + (void)_replaceInLayer:(CALayer*)layer sublayer:(CALayer*)sublayer withSublayer:(CALayer*)newlayer {
-    [self _currentLayerTransaction]->AddLayer(
-                               [newlayer _layerProxy],
-                               [layer _layerProxy],
-                               [sublayer _layerProxy],
-                               NULL);
+    [self _currentLayerTransaction]->AddLayer([newlayer _layerProxy], [layer _layerProxy], [sublayer _layerProxy], NULL);
     [self _currentLayerTransaction]->RemoveLayer([sublayer _layerProxy]);
 }
 
 + (void)_moveLayer:(CALayer*)layer beforeLayer:(CALayer*)before afterLayer:(CALayer*)after {
-    [self _currentLayerTransaction]->MoveLayer(
-                                [layer _layerProxy],
-                                before ? [before _layerProxy] : nullptr,
-                                after ? [after _layerProxy] : nullptr);
+    [self _currentLayerTransaction]->MoveLayer([layer _layerProxy],
+                                               before ? [before _layerProxy] : nullptr,
+                                               after ? [after _layerProxy] : nullptr);
 }
 
 + (void)_removeLayer:(CALayer*)layer {

@@ -118,17 +118,15 @@ public:
 
     // CAAnimation support
     virtual std::shared_ptr<ILayerAnimation> CreateBasicAnimation(CAAnimation* animation,
-                                                                       NSString* propertyName,
-                                                                       NSObject* fromValue,
-                                                                       NSObject* toValue,
-                                                                       NSObject* byValue,
-                                                                       CAMediaTimingProperties* timingProperties) override {
+                                                                  NSString* propertyName,
+                                                                  NSObject* fromValue,
+                                                                  NSObject* toValue,
+                                                                  NSObject* byValue,
+                                                                  CAMediaTimingProperties* timingProperties) override {
         return LayerAnimation::CreateBasicAnimation(animation, propertyName, fromValue, toValue, byValue, timingProperties);
     }
 
-    virtual std::shared_ptr<ILayerAnimation> CreateTransitionAnimation(CAAnimation* animation,
-                                                                      NSString* type,
-                                                                      NSString* subType) override {
+    virtual std::shared_ptr<ILayerAnimation> CreateTransitionAnimation(CAAnimation* animation, NSString* type, NSString* subType) override {
         return LayerAnimation::CreateTransitionAnimation(animation, type, subType);
     }
 

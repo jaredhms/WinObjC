@@ -88,7 +88,10 @@ public:
     float _contentsScale;
     bool _applyingTexture;
 
-    QueuedProperty(const std::shared_ptr<ILayerProxy>& layer, const std::shared_ptr<IDisplayTexture>& newTexture, CGSize contentsSize, float contentsScale) {
+    QueuedProperty(const std::shared_ptr<ILayerProxy>& layer,
+                   const std::shared_ptr<IDisplayTexture>& newTexture,
+                   CGSize contentsSize,
+                   float contentsScale) {
         _layer = std::dynamic_pointer_cast<LayerProxy>(layer);
         _propertyName = IwStrDup("contents");
         _propertyValue = NULL;
@@ -137,10 +140,10 @@ public:
     MovementType _type;
 
     QueuedMovement(MovementType type,
-                       const std::shared_ptr<ILayerProxy>& layer,
-                       const std::shared_ptr<ILayerProxy>& before,
-                       const std::shared_ptr<ILayerProxy>& after,
-                       const std::shared_ptr<ILayerProxy>& superLayer) {
+                   const std::shared_ptr<ILayerProxy>& layer,
+                   const std::shared_ptr<ILayerProxy>& before,
+                   const std::shared_ptr<ILayerProxy>& after,
+                   const std::shared_ptr<ILayerProxy>& superLayer) {
         _type = type;
         _layer = std::dynamic_pointer_cast<LayerProxy>(layer);
         _before = std::dynamic_pointer_cast<LayerProxy>(before);
@@ -170,34 +173,30 @@ public:
 };
 
 void LayerTransaction::AddLayer(const std::shared_ptr<ILayerProxy>& layer,
-    const std::shared_ptr<ILayerProxy>& superLayer,
-    const std::shared_ptr<ILayerProxy>& beforeLayer,
-    const std::shared_ptr<ILayerProxy>& afterLayer) {
-    _QueueMovement(
-        std::make_shared<QueuedMovement>(QueuedMovement::Add, layer, beforeLayer, afterLayer, superLayer));
+                                const std::shared_ptr<ILayerProxy>& superLayer,
+                                const std::shared_ptr<ILayerProxy>& beforeLayer,
+                                const std::shared_ptr<ILayerProxy>& afterLayer) {
+    _QueueMovement(std::make_shared<QueuedMovement>(QueuedMovement::Add, layer, beforeLayer, afterLayer, superLayer));
 }
 
 void LayerTransaction::MoveLayer(const std::shared_ptr<ILayerProxy>& layer,
-    const std::shared_ptr<ILayerProxy>& beforeLayer,
-    const std::shared_ptr<ILayerProxy>& afterLayer) {
-    _QueueMovement(
-        std::make_shared<QueuedMovement>(QueuedMovement::Move, layer, beforeLayer, afterLayer, nullptr));
+                                 const std::shared_ptr<ILayerProxy>& beforeLayer,
+                                 const std::shared_ptr<ILayerProxy>& afterLayer) {
+    _QueueMovement(std::make_shared<QueuedMovement>(QueuedMovement::Move, layer, beforeLayer, afterLayer, nullptr));
 }
 
 void LayerTransaction::RemoveLayer(const std::shared_ptr<ILayerProxy>& layer) {
     _QueueMovement(std::make_shared<QueuedMovement>(QueuedMovement::Remove, layer, nullptr, nullptr, nullptr));
 }
 
-void LayerTransaction::SetLayerProperty(const std::shared_ptr<ILayerProxy>& layer,
-    const char* propertyName,
-    NSObject* newValue) {
+void LayerTransaction::SetLayerProperty(const std::shared_ptr<ILayerProxy>& layer, const char* propertyName, NSObject* newValue) {
     _QueueProperty(std::make_shared<QueuedProperty>(layer, propertyName, newValue));
 }
 
 void LayerTransaction::SetLayerTexture(const std::shared_ptr<ILayerProxy>& layer,
-    const std::shared_ptr<IDisplayTexture>& newTexture,
-    CGSize contentsSize,
-    float contentsScale) {
+                                       const std::shared_ptr<IDisplayTexture>& newTexture,
+                                       CGSize contentsSize,
+                                       float contentsScale) {
     _QueueProperty(std::make_shared<QueuedProperty>(layer, newTexture, contentsSize, contentsScale));
 }
 
@@ -211,9 +210,9 @@ void LayerTransaction::RemoveAnimation(const std::shared_ptr<ILayerAnimation>& a
 
 void LayerTransaction::Process() {
     DispatchCompositorTransactions(std::move(_queuedTransactions),
-        std::move(_queuedAnimations),
-        std::move(_queuedProperties),
-        std::move(_queuedMovements));
+                                   std::move(_queuedAnimations),
+                                   std::move(_queuedProperties),
+                                   std::move(_queuedMovements));
 }
 
 void LayerTransaction::_QueueProperty(const std::shared_ptr<QueuedProperty> property) {

@@ -33,18 +33,14 @@
 class LayerAnimation : public ILayerAnimation, public std::enable_shared_from_this<LayerAnimation> {
 public:
 #if defined(__OBJC__)
-    static std::shared_ptr<ILayerAnimation> CreateBasicAnimation(
-        CAAnimation* animation,
-        NSString* propertyName,
-        NSObject* fromValue,
-        NSObject* toValue,
-        NSObject* byValue,
-        CAMediaTimingProperties* timingProperties);
+    static std::shared_ptr<ILayerAnimation> CreateBasicAnimation(CAAnimation* animation,
+                                                                 NSString* propertyName,
+                                                                 NSObject* fromValue,
+                                                                 NSObject* toValue,
+                                                                 NSObject* byValue,
+                                                                 CAMediaTimingProperties* timingProperties);
 
-    static std::shared_ptr<ILayerAnimation> CreateTransitionAnimation(
-        CAAnimation* animation,
-        NSString* type,
-        NSString* subType);
+    static std::shared_ptr<ILayerAnimation> CreateTransitionAnimation(CAAnimation* animation, NSString* type, NSString* subType);
 #endif
 
     void Stop();
@@ -54,7 +50,7 @@ public:
 
 protected:
     LayerAnimation();
-    virtual ~LayerAnimation() {};
+    virtual ~LayerAnimation(){};
 
     void _CreateXamlAnimation();
     void _Start();

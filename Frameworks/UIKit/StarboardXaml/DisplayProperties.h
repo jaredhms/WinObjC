@@ -37,5 +37,4 @@ void SetScreenDpi(int xDpi, int yDpi);
 int DeviceWidth();
 int DeviceHeight();
 void SetDeviceSize(int width, int height);
-
 }
