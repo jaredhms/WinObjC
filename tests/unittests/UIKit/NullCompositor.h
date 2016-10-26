@@ -32,7 +32,7 @@ public:
         return nullptr;
     }
     void QueueLayerTransaction(const std::shared_ptr<ILayerTransaction>& transaction,
-        const std::shared_ptr<ILayerTransaction>& onTransaction) override {
+                               const std::shared_ptr<ILayerTransaction>& onTransaction) override {
     }
     void ProcessLayerTransactions() override {
     }
@@ -44,16 +44,14 @@ public:
 
     // CAAnimation support
     std::shared_ptr<ILayerAnimation> CreateBasicAnimation(CAAnimation* animation,
-                                                                 NSString* propertyName,
-                                                                 NSObject* fromValue,
-                                                                 NSObject* toValue,
-                                                                 NSObject* byValue,
-                                                                 CAMediaTimingProperties* timingProperties) override {
+                                                          NSString* propertyName,
+                                                          NSObject* fromValue,
+                                                          NSObject* toValue,
+                                                          NSObject* byValue,
+                                                          CAMediaTimingProperties* timingProperties) override {
         return nullptr;
     }
-    std::shared_ptr<ILayerAnimation> CreateTransitionAnimation(CAAnimation* animation,
-                                                                      NSString* type,
-                                                                      NSString* subtype) override {
+    std::shared_ptr<ILayerAnimation> CreateTransitionAnimation(CAAnimation* animation, NSString* type, NSString* subtype) override {
         return nullptr;
     }
 
