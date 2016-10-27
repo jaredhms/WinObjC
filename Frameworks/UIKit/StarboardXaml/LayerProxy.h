@@ -35,12 +35,11 @@ public:
     void* GetPropertyValue(const char* propertyName) override;
     void SetShouldRasterize(bool shouldRasterize) override;
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    // TODO: Can we remove this altogether and just set the z-index on the backing xaml element?
+    // TODO: Can we remove this altogether at some point?
     void SetTopMost() override;
-    ///////////////////////////////////////////////////////////////////////////////////////////////
 
     // General property management
+    void SetTexture(const std::shared_ptr<IDisplayTexture>& texture, float width, float height, float scale);
     void UpdateProperty(const char* name, void* value);
 
     // Sublayer management
@@ -58,14 +57,11 @@ private:
     void _SetHidden(bool hidden);
     void _SetMasksToBounds(bool masksToBounds);
     void _SetBackgroundColor(float r, float g, float b, float a);
-    void _SetTexture(const std::shared_ptr<IDisplayTexture>& texture, float width, float height, float scale);
     void _SetContents(const Microsoft::WRL::ComPtr<IInspectable>& bitmap, float width, float height, float scale);
     void _SetContentsCenter(float x, float y, float width, float height);
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    // TODO: SHOULD REMOVE AND JUST DO ON UIWINDOW'S CANVAS
+    // TODO: We should remove this and just do it on UIWindow's backing element since that's the only place it's used
     void _SetZIndex(int zIndex);
-    ///////////////////////////////////////////////////////////////////////////////////////////////
 
     // Property management
     float _GetPresentationPropertyValue(const char* name);

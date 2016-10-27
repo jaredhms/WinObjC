@@ -24,7 +24,7 @@
 
 static const wchar_t* TAG = L"LayerProxy";
 
-void LayerProxy::_SetTexture(const std::shared_ptr<IDisplayTexture>& texture, float width, float height, float contentScale) {
+void LayerProxy::SetTexture(const std::shared_ptr<IDisplayTexture>& texture, float width, float height, float contentScale) {
     _currentTexture = texture;
     _SetContents((texture ? texture->GetContent() : nullptr), width, height, contentScale);
 }

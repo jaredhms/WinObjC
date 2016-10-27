@@ -32,10 +32,8 @@ using namespace Windows::UI::Xaml::Media;
 
 static const wchar_t* TAG = L"LayerProxy";
 
-//////////////////////////////////////////////////////////////////
-// TODO: WE SHOULD GET RID OF THIS OR MORE FORMALLY EXPOSE IT
+// TODO: We should formally expose this off of XamlCompositor for our use here.
 extern Canvas^ s_windowCollection;
-//////////////////////////////////////////////////////////////////
 
 __inline FrameworkElement^ _FrameworkElementFromInspectable(const ComPtr<IInspectable>& element) {
     return dynamic_cast<FrameworkElement^>(reinterpret_cast<Platform::Object^>(element.Get()));
@@ -83,7 +81,7 @@ Microsoft::WRL::ComPtr<IInspectable> LayerProxy::GetXamlElement() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
-// TODO: This should just happen in UIWindow.mm and should get deleted from here
+// TODO: We should remove this and just do it on UIWindow's backing element since that's the only place it's used
 void LayerProxy::_SetZIndex(int zIndex) {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
     xamlLayer->SetValue(Canvas::ZIndexProperty, zIndex);
