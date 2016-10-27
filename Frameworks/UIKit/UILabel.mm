@@ -112,13 +112,13 @@
 
     /////////////////////////////////////////////////////////////////////////////
     // TODO: Call when we can get it to compile (waiting on Muktesh's changes
+    // TODO: Make sure MM renders properly with/without this
     // [_textBlock setFontFamily:WUXFontFamilyFromUIFontName(_font fontName)];
 
     [_textBlock setTextAlignment:ConvertUITextAlignmentToWXTextAlignment(_alignment)];
 
     [_textBlock setLineStackingStrategy:WXLineStackingStrategyBlockLineHeight];
 
-    // TODO: Make sure MM renders properly with/without this
     // The first 'welcome' label is truncated vertically
     [_textBlock setLineHeight:[_font ascender] - [_font descender]];
 

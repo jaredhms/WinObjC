@@ -614,9 +614,19 @@ static std::string _printViewHeirarchy(UIView* leafView) {
     [self.layer._xamlElement setIsHitTestVisible:isHitTestable];
 }
 
-- (void)_initPrivWithXamlElement:(WXFrameworkElement*)xamlElement {
+- (void)_initPrivWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
+    // Nothing to do if we're already initialized
     if (self->priv) {
         return;
+    }
+
+    if (DEBUG_LAYOUT) {
+        TraceVerbose(TAG,
+                     L"[%f,%f] @ %fx%f",
+                     (float)frame.origin.x,
+                     (float)frame.origin.y,
+                     (float)frame.size.width,
+                     (float)frame.size.height);
     }
 
     viewCount++;
@@ -715,26 +725,31 @@ static std::string _printViewHeirarchy(UIView* leafView) {
  @Status Interoperable
 */
 - (instancetype)initWithFrame:(CGRect)frame {
-    return [self initWithFrame:frame xamlElement:nil];
+    // Run on the main thread because the underlying XAML objects can only be
+    // called from the UI thread
+    RunSynchronouslyOnMainThread(^{
+        [self _initPrivWithFrame:frame xamlElement:nil];
+
+        // Default state
+        [self setOpaque:TRUE];
+        [self setFrame:frame];
+        [self setNeedsDisplay];
+        [self initAccessibility];
+    });
+
+    return self;
 }
 
 /**
  Microsoft extension
 */
 - (instancetype)initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
-    if (DEBUG_LAYOUT) {
-        TraceVerbose(TAG,
-                     L"[%f,%f] @ %fx%f",
-                     (float)frame.origin.x,
-                     (float)frame.origin.y,
-                     (float)frame.size.width,
-                     (float)frame.size.height);
-    }
-
     // Run on the main thread because the underlying XAML objects can only be
     // called from the UI thread
     RunSynchronouslyOnMainThread(^{
-        [self _initPrivWithXamlElement:xamlElement];
+        [self _initPrivWithFrame:frame xamlElement:xamlElement];
+
+        // Default state
         [self setOpaque:TRUE];
         [self setFrame:frame];
         [self setNeedsDisplay];
@@ -769,8 +784,10 @@ static std::string _printViewHeirarchy(UIView* leafView) {
  @Notes May not be fully implemented
 */
 - (instancetype)initWithCoder:(NSCoder*)coder {
-    CGRect bounds;
+    // Init priv, get our backing Xaml element, etc.
+    [self _initPrivWithFrame:CGRectZero xamlElement:nil];
 
+    CGRect bounds;
     id boundsObj = [coder decodeObjectForKey:@"UIBounds"];
     if (boundsObj != nil) {
         if ([boundsObj isKindOfClass:[NSString class]]) {
@@ -786,7 +803,6 @@ static std::string _printViewHeirarchy(UIView* leafView) {
     }
 
     CGPoint center;
-
     id centerObj = [coder decodeObjectForKey:@"UICenter"];
     if (centerObj) {
         if ([centerObj isKindOfClass:[NSString class]]) {
@@ -1176,6 +1192,7 @@ static void doResize(unsigned mask, float& pos, float& size, float parentSize, f
 }
 
 static void adjustSubviews(UIView* self, CGSize parentSize, CGSize delta) {
+    // Nothing to do if we're not even initialized yet
     if (!self->priv) {
         return;
     }

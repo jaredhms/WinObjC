@@ -249,8 +249,11 @@ UIInterfaceOrientation supportedOrientationForOrientation(UIViewController* cont
 }
 
 - (instancetype)initWithIdentifier:(NSString*)identifier {
-    _identifier = identifier;
-    self.translatesAutoresizingMaskIntoConstraints = NO;
+    if (self = [super init]) {
+        _identifier = identifier;
+        self.translatesAutoresizingMaskIntoConstraints = NO;
+    }
+
     return self;
 }
 
@@ -260,11 +263,13 @@ UIInterfaceOrientation supportedOrientationForOrientation(UIViewController* cont
 }
 
 - (instancetype)initWithCoder:(NSCoder*)coder {
-    _UILayoutGuide* ret = [super initWithCoder:coder];
-    _identifier = [coder decodeObjectForKey:@"_UILayoutGuideIdentifier"];
-    self.translatesAutoresizingMaskIntoConstraints = NO;
-    assert(_identifier);
-    return ret;
+    if (self = [super initWithCoder:coder]) {
+        _identifier = [coder decodeObjectForKey:@"_UILayoutGuideIdentifier"];
+        self.translatesAutoresizingMaskIntoConstraints = NO;
+        assert(_identifier);
+    }
+
+    return self;
 }
 
 - (CGFloat)length {
