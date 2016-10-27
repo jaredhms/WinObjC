@@ -41,13 +41,13 @@
 
 #import "CAAnimationInternal.h"
 #import "CALayerInternal.h"
-#import "CACompositor.h"
+#import "StarboardXaml/DisplayProperties.h"
 #import "UIEventInternal.h"
 #import "UIGestureRecognizerInternal.h"
 #import "UITouchInternal.h"
 #import "Etc.h"
+#import "XamlControls.h"
 #import "XamlUtilities.h"
-#import "StarboardXaml/CompositorInterface.h"
 
 static const wchar_t* TAG = L"UIScrollView";
 
@@ -61,23 +61,6 @@ static const bool DEBUG_ZOOM = DEBUG_ALL || false;
 const float UIScrollViewDecelerationRateNormal = StubConstant();
 /** @Status Stub */
 const float UIScrollViewDecelerationRateFast = StubConstant();
-
-// Customer CALayer for UIScrollview
-@interface _UIScrollViewCALayer : CALayer
-@end
-
-@implementation _UIScrollViewCALayer
-- (instancetype)init {
-    self = [super init];
-    return self;
-}
-
-// override setOrigin not to adjust its content origin because scrolling is now done by scrollviewer
-// otherwise, it will cause double scrolling for the content
-- (void)setOrigin:(CGPoint)origin {
-    [self _setOrigin:origin updateContent:NO];
-}
-@end
 
 @implementation UIScrollView {
     CGPoint _contentOffset;
@@ -139,12 +122,11 @@ const float UIScrollViewDecelerationRateFast = StubConstant();
     WXCScrollBarVisibility _previousVerticalScrollBarVisibility;
 }
 
-- (void)_initScrollViewer:(WXFrameworkElement*)xamlElement {
-    // creating backing scrollviewer
-    if (!xamlElement) {
-        _scrollViewer = [WXCScrollViewer make];
-    } else {
-        _scrollViewer = rt_dynamic_cast<WXCScrollViewer>(xamlElement);
+- (void)_initUIScrollView {
+    // Store a strongly-typed backing scrollviewer
+    _scrollViewer = rt_dynamic_cast<WXCScrollViewer>([self xamlElement]);
+    if (!_scrollViewer) {
+        FAIL_FAST();
     }
 
     [self setMultipleTouchEnabled:TRUE];
@@ -159,9 +141,15 @@ const float UIScrollViewDecelerationRateFast = StubConstant();
     _leftInset = [WUXSRectangle make];
     _leftInset.name = @"left";
 
-    // create content canvas
+    // Create a content canvas for our subviews
     _contentCanvas = [WXCCanvas make];
     _contentCanvas.name = @"Content Canvas";
+
+    // Set up the CALayer properties for our backing Xaml element so
+    // our subviews are placed within our _contentCanvas
+    XamlControls::SetFrameworkElementLayerProperties(_scrollViewer,
+                                                     nullptr, // content element
+                                                     _contentCanvas); // sublayer canvas
 
     // creating and build 3 X 3 content grid
     _contentGrid = [WXCGrid make];
@@ -220,10 +208,6 @@ const float UIScrollViewDecelerationRateFast = StubConstant();
     _scrollViewer.isVerticalRailEnabled = NO;
 
     _loaded = NO;
-
-    // setting the rootElement and the content element for scroll viewer
-    DisplayNode* displayNode = [[self layer] _presentationNode];
-    displayNode->SetScrollviewerControls(_scrollViewer.comObj.Get(), _contentCanvas.comObj.Get());
 
     // setting up manipulation, viewchanging and viewchanged event handlers
     [self _setupManipulationEventHandlers];
@@ -560,13 +544,9 @@ const float UIScrollViewDecelerationRateFast = StubConstant();
  @Notes May not be fully implemented
 */
 - (instancetype)initWithCoder:(NSCoder*)coder {
-    return [self _initWithCoder:coder xamlElement:nil];
-}
-
-- (instancetype)_initWithCoder:(NSCoder*)coder xamlElement:(WXFrameworkElement*)xamlElement {
-    [self _initScrollViewer:xamlElement];
-
     if (self = [super initWithCoder:coder]) {
+        [self _initUIScrollView];
+
         if ([coder containsValueForKey:@"UIDelaysContentTouches"]) {
             _delaysContentTouches = [coder decodeBoolForKey:@"UIDelaysContentTouches"];
         } else {
@@ -613,18 +593,27 @@ const float UIScrollViewDecelerationRateFast = StubConstant();
  @Status Interoperable
 */
 - (instancetype)initWithFrame:(CGRect)frame {
-    return [self _initWithFrame:frame xamlElement:nil];
+    return [self initWithFrame:frame xamlElement:nil];
 }
 
-- (instancetype)_initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
-    if (self = [super initWithFrame:frame]) {
+/**
+ Microsoft Extension
+*/
+- (instancetype)initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
+    if (self = [super initWithFrame:frame xamlElement:xamlElement]) {
+        [self _initUIScrollView];
         [self setClipsToBounds:1];
         _delaysContentTouches = TRUE;
-
-        [self _initScrollViewer:xamlElement];
     }
 
     return self;
+}
+
+/**
+ Microsoft Extension
+*/
++ (WXFrameworkElement*)createXamlElement {
+    return [WXCScrollViewer make];
 }
 
 /**
@@ -811,7 +800,7 @@ static void clipPoint(UIScrollView* o, CGPoint& p, bool bounce = true) {
         TraceVerbose(TAG, L"refreshOrigin");
     }
 
-    [self.layer setOrigin:_contentOffset];
+    [self.layer _setOrigin:_contentOffset];
     [self setNeedsLayout];
 
     if ([self.delegate respondsToSelector:@selector(scrollViewDidScroll:)]) {
@@ -1457,10 +1446,6 @@ static float findMinY(UIScrollView* o) {
 - (UIPanGestureRecognizer*)panGestureRecognizer {
     UNIMPLEMENTED();
     return StubReturn();
-}
-
-+ (Class)layerClass {
-    return [_UIScrollViewCALayer class];
 }
 
 @end

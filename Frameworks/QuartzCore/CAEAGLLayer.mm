@@ -22,7 +22,6 @@
 #include "CALayerInternal.h"
 #include "UIKit/UIView.h"
 #include "QuartzCore/CAEAGLLayer.h"
-#include "CACompositor.h"
 #include "CAEAGLLayerInternal.h"
 
 #include <d3d11.h>
@@ -34,7 +33,7 @@
 
 @implementation CAEAGLLayer {
     NSDictionary* _properties;
-    WXCSwapChainPanel* _swapChainPanel;
+    StrongId<WXCSwapChainPanel> _swapChainPanel;
 }
 
 /**
@@ -52,25 +51,17 @@
 /**
  @Status Interoperable
 */
-- (void)setContentsScale:(float)factor {
-    [super setContentsScale:factor];
-
-    WUXMScaleTransform* scaleTransform = [WUXMScaleTransform make];
-    scaleTransform.scaleX = 1.0 / factor;
-    scaleTransform.scaleY = 1.0 / factor;
-
-    _swapChainPanel.renderTransform = scaleTransform;
-    [scaleTransform release];
-}
-
-/**
- @Status Interoperable
-*/
 - (instancetype)init {
     if (self = [super init]) {
-        _swapChainPanel = [WXCSwapChainPanel make];
-        self.contentsElement = _swapChainPanel;
+        // Create our swapchain panel
+        _swapChainPanel.attach([WXCSwapChainPanel make]);
+
+        // Create a sublayer for the swapchain panel
+        StrongId<CALayer> sublayer;
+        sublayer.attach([[CALayer alloc] _initWithXamlElement:_swapChainPanel]);
+        [self addSublayer:sublayer];
     }
+
     return self;
 }
 
@@ -82,8 +73,8 @@
     return _swapChainPanel;
 }
 
-- (DisplayTexture*)_getDisplayTexture {
-    return NULL;
+- (std::shared_ptr<IDisplayTexture>)_getDisplayTexture {
+    return nullptr;
 }
 
 /**
@@ -105,7 +96,6 @@
 
 - (void)dealloc {
     [_properties release];
-    [_swapChainPanel release];
     [super dealloc];
 }
 @end

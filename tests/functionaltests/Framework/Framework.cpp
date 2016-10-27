@@ -31,7 +31,6 @@
 
 #include <ErrorHandling.h>
 #include <StringHelpers.h>
-#include <VCInclude/winobjc/winobjc.h>
 
 using namespace Microsoft::WRL;
 using namespace ABI::Windows::ApplicationModel::Core;

@@ -79,7 +79,7 @@ struct ButtonState {
 */
 - (instancetype)initWithCoder:(NSCoder*)coder {
     if (self = [super initWithCoder:coder]) {
-        [self _UIButton_initInternal:nil];
+        [self _initUIButton];
 
         if ([coder containsValueForKey:@"UIDisabled"]) {
             BOOL disabled = [coder decodeIntegerForKey:@"UIDisabled"];
@@ -155,11 +155,11 @@ struct ButtonState {
     [self _processPointerEvent:e forTouchPhase:UITouchPhaseCancelled];
 }
 
-- (void)_UIButton_initInternal:(WXFrameworkElement*)xamlElement {
-    if (xamlElement != nil && [xamlElement isKindOfClass:[WXCButton class]]) {
-        _xamlButton = static_cast<WXCButton*>(xamlElement);
-    } else {
-        _xamlButton = XamlControls::CreateButton();
+- (void)_initUIButton {
+    // Store a strongly-typed backing button
+    _xamlButton = rt_dynamic_cast<WXCButton>([self xamlElement]);
+    if (!_xamlButton) {
+        FAIL_FAST();
     }
 
     // Force-load the template, and get the TextBlock and Image for use in our proxies.
@@ -182,7 +182,7 @@ struct ButtonState {
     // Set the XAML element's name so it's easily found in the VS live tree viewer
     [_xamlButton setName:[NSString stringWithUTF8String:object_getClassName(self)]];
 
-    __block UIButton* weakSelf = self;
+    __weak UIButton* weakSelf = self;
     XamlControls::HookButtonPointerEvents(_xamlButton,
                                           ^(RTObject* sender, WUXIPointerRoutedEventArgs* e) {
                                               // We mark the event as handled here. The method _processPointerPressedCallback
@@ -221,27 +221,35 @@ struct ButtonState {
                                       // intrinsicContentSize is invalidated.
                                       [weakSelf setNeedsLayout];
                                   });
-
-    [self layer].contentsElement = _xamlButton;
 }
 
-- (instancetype)_initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
+/**
+ @Status Interoperable
+*/
+- (instancetype)initWithFrame:(CGRect)frame {
     if (self = [super initWithFrame:frame]) {
-        [self _UIButton_initInternal:xamlElement];
+        [self _initUIButton];
     }
 
     return self;
 }
 
 /**
- @Status Interoperable
+Microsoft Extension
 */
-- (instancetype)initWithFrame:(CGRect)pos {
-    if (self = [super initWithFrame:pos]) {
-        [self _UIButton_initInternal:nil];
+- (instancetype)initWithFrame:(CGRect)frame xamlElement:(WXFrameworkElement*)xamlElement {
+    if (self = [super initWithFrame:frame xamlElement:xamlElement]) {
+        [self _initUIButton];
     }
 
     return self;
+}
+
+/**
+ Microsoft Extension
+*/
++ (WXFrameworkElement*)createXamlElement {
+    return XamlControls::CreateButton();
 }
 
 /**
@@ -263,8 +271,8 @@ struct ButtonState {
         _states[state].inspectableImage = [imageBrush comObj];
     }
 
+    [self setNeedsDisplay];
     [self setNeedsLayout];
-    [self layoutIfNeeded];
 }
 
 /**
@@ -436,8 +444,8 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
                                                  image.capInsets.bottom * image.scale };
     }
 
+    [self setNeedsDisplay];
     [self setNeedsLayout];
-    [self layoutIfNeeded];
 }
 
 /**
@@ -482,8 +490,8 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
         _states[state].inspectableTitle = [rtString comObj];
     }
 
+    [self setNeedsDisplay];
     [self setNeedsLayout];
-    [self layoutIfNeeded];
 }
 
 /**
@@ -514,7 +522,7 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
     }
 
     [self setNeedsLayout];
-    [self layoutIfNeeded];
+    [self setNeedsDisplay];
 }
 
 /**
@@ -585,8 +593,8 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
     // Relayout when new state is different than old state
     if (_curState != newState) {
         _curState = newState;
+        [self setNeedsDisplay];
         [self setNeedsLayout];
-        [self layoutIfNeeded];
     }
 
     [super touchesBegan:touchSet withEvent:event];
@@ -609,8 +617,8 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
     // Relayout when new state is different than old state
     if (_curState != newState) {
         _curState = newState;
+        [self setNeedsDisplay];
         [self setNeedsLayout];
-        [self layoutIfNeeded];
     }
 
     [super touchesEnded:touchSet withEvent:event];
@@ -633,8 +641,8 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
     // Relayout when new state is different than old state
     if (_curState != newState) {
         _curState = newState;
+        [self setNeedsDisplay];
         [self setNeedsLayout];
-        [self layoutIfNeeded];
     }
 
     [super touchesCancelled:touchSet withEvent:event];
@@ -751,6 +759,8 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
  @Status Interoperable
 */
 - (void)dealloc {
+    [super dealloc];
+
     XamlRemovePointerEvents([_xamlButton comObj]);
     XamlRemoveLayoutEvent([_xamlButton comObj]);
 
@@ -762,7 +772,6 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
     }
 
     _xamlButton = nil;
-    [super dealloc];
 }
 
 /**
