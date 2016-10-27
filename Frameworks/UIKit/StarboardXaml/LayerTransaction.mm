@@ -58,20 +58,18 @@ public:
             if (![_animation wasRemoved] && ![_animation wasAborted]) {
                 std::shared_ptr<ILayerAnimation> newAnimation = [_animation _createAnimation:_layer forKey:_key];
 
-                ///////////////////////////////////////////////
-                // TODO: Call in _createAnimation on success?
+                /////////////////////////////////////////////////////
+                // TODO: Call in _createAnimation impls on success?
                 [_animation animationDidStart];
                 [_animation animationHasStarted];
-                ///////////////////////////////////////////////
 
                 if (newAnimation) {
                     std::shared_ptr<ILayerProxy> layer = [_layer _layerProxy];
                     return std::dynamic_pointer_cast<LayerAnimation>(newAnimation)->AddToLayer(*layer);
                 } else {
-                    ///////////////////////////////////////////////
-                    // TODO: Call in _createAnimation on failure?
+                    /////////////////////////////////////////////////////
+                    // TODO: Call in _createAnimation impls on failure?
                     [_animation animationDidStop:FALSE];
-                    ///////////////////////////////////////////////
                 }
             }
         }

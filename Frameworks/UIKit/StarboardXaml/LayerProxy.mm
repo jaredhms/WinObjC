@@ -161,11 +161,9 @@ void LayerProxy::UpdateProperty(const char* name, void* value) {
         }
         _SetProperty("transform.rotation", toPosition);
     } else if (strcmp(name, "zIndex") == 0) {
-        ///////////////////////////////////////////////////////////////////////////////////////
-        // TODO: This should just happen in UIWindow.mm and should get deleted from here
+        // TODO: We should remove this and just do it on UIWindow's backing element since that's the only place it's used
         int value = [(NSNumber*)newValue intValue];
         _SetZIndex(value);
-        ///////////////////////////////////////////////////////////////////////////////////////
     } else if (strcmp(name, "gravity") == 0) {
         _SetPropertyInt("gravity", [(NSNumber*)newValue intValue]);
     } else if (strcmp(name, "backgroundColor") == 0) {

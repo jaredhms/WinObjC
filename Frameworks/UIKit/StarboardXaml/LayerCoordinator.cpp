@@ -796,14 +796,14 @@ void LayerCoordinator::_RegisterDependencyProperties() {
             double::typeid,
             FrameworkElement::typeid,
             ref new PropertyMetadata(0.0,
-            ref new PropertyChangedCallback(&LayerCoordinator::_sizeChangedCallback)));
+            ref new PropertyChangedCallback(&LayerCoordinator::_SizeChangedCallback)));
 
         s_visualHeightProperty = DependencyProperty::RegisterAttached(
             "VisualHeight",
             double::typeid,
             FrameworkElement::typeid,
             ref new PropertyMetadata(0.0,
-            ref new PropertyChangedCallback(&LayerCoordinator::_sizeChangedCallback)));
+            ref new PropertyChangedCallback(&LayerCoordinator::_SizeChangedCallback)));
 
         s_contentGravityProperty = DependencyProperty::RegisterAttached(
             "ContentGravity",
@@ -1032,7 +1032,7 @@ void LayerCoordinator::SetVisualHeight(FrameworkElement^ element, double value) 
     element->SetValue(s_visualHeightProperty, value);
 }
 
-void LayerCoordinator::_sizeChangedCallback(DependencyObject^ sender, DependencyPropertyChangedEventArgs^ args) {
+void LayerCoordinator::_SizeChangedCallback(DependencyObject^ sender, DependencyPropertyChangedEventArgs^ args) {
     auto element = safe_cast<FrameworkElement^>(sender);
 
     //////////////////////////////////////////////////////////////////////////////////////////////

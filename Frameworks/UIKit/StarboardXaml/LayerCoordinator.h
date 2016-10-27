@@ -65,7 +65,7 @@ internal:
     // CALayer border support
 
 ///////////////////////////////////////////////////////////////////////////////////
-// TODO: EVERYTHING BELOW SHOULD/CAN PROB GO INTO A .CPP FILE AS A HELPER REF CLASS
+// TODO: Everything below should/can probably go into a separate helper ref class
 
     // AnchorPoint
     static property Windows::UI::Xaml::DependencyProperty^ AnchorPointProperty {
@@ -173,9 +173,7 @@ private:
     static void _ApplyContentGravity(Windows::UI::Xaml::FrameworkElement^ element, ContentGravity gravity);
     static Windows::Foundation::Size _GetContentSize(Windows::UI::Xaml::FrameworkElement^ element);
     static void _SetContentSize(Windows::UI::Xaml::FrameworkElement^ element, Windows::Foundation::Size value);
-
-    // TODO: Revisit whether or not we actually need this - it can't be very performant...?
-    static void _sizeChangedCallback(Windows::UI::Xaml::DependencyObject^ sender, Windows::UI::Xaml::DependencyPropertyChangedEventArgs^ args);
+    static void _SizeChangedCallback(Windows::UI::Xaml::DependencyObject^ sender, Windows::UI::Xaml::DependencyPropertyChangedEventArgs^ args);
 };
 
 } /* namespace CoreAnimation */
