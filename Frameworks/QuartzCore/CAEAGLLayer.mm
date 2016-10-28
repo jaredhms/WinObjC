@@ -51,6 +51,21 @@
 /**
  @Status Interoperable
 */
+- (void)setContentsScale:(float)factor {
+    [super setContentsScale:factor];
+
+    WUXMScaleTransform* scaleTransform = [WUXMScaleTransform make];
+    scaleTransform.scaleX = 1.0 / factor;
+    scaleTransform.scaleY = 1.0 / factor;
+
+    _swapChainPanel.get().renderTransform = scaleTransform;
+    [scaleTransform release];
+}
+
+
+/**
+ @Status Interoperable
+*/
 - (instancetype)init {
     if (self = [super init]) {
         // Create our swapchain panel

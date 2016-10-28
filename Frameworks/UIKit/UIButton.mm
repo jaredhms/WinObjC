@@ -182,7 +182,7 @@ struct ButtonState {
     // Set the XAML element's name so it's easily found in the VS live tree viewer
     [_xamlButton setName:[NSString stringWithUTF8String:object_getClassName(self)]];
 
-    __weak UIButton* weakSelf = self;
+    __block UIButton* weakSelf = self;
     XamlControls::HookButtonPointerEvents(_xamlButton,
                                           ^(RTObject* sender, WUXIPointerRoutedEventArgs* e) {
                                               // We mark the event as handled here. The method _processPointerPressedCallback
@@ -271,8 +271,8 @@ Microsoft Extension
         _states[state].inspectableImage = [imageBrush comObj];
     }
 
-    [self setNeedsDisplay];
     [self setNeedsLayout];
+    [self layoutIfNeeded];
 }
 
 /**
@@ -444,8 +444,8 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
                                                  image.capInsets.bottom * image.scale };
     }
 
-    [self setNeedsDisplay];
     [self setNeedsLayout];
+    [self layoutIfNeeded];
 }
 
 /**
@@ -490,8 +490,8 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
         _states[state].inspectableTitle = [rtString comObj];
     }
 
-    [self setNeedsDisplay];
     [self setNeedsLayout];
+    [self layoutIfNeeded];
 }
 
 /**
@@ -521,8 +521,8 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
         _states[state].inspectableTitleColor = [titleColorBrush comObj];
     }
 
-    [self setNeedsLayout];
     [self setNeedsDisplay];
+    [self layoutIfNeeded];
 }
 
 /**
@@ -593,8 +593,8 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
     // Relayout when new state is different than old state
     if (_curState != newState) {
         _curState = newState;
-        [self setNeedsDisplay];
         [self setNeedsLayout];
+        [self layoutIfNeeded];
     }
 
     [super touchesBegan:touchSet withEvent:event];
@@ -617,8 +617,8 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
     // Relayout when new state is different than old state
     if (_curState != newState) {
         _curState = newState;
-        [self setNeedsDisplay];
         [self setNeedsLayout];
+        [self layoutIfNeeded];
     }
 
     [super touchesEnded:touchSet withEvent:event];
@@ -641,8 +641,8 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
     // Relayout when new state is different than old state
     if (_curState != newState) {
         _curState = newState;
-        [self setNeedsDisplay];
         [self setNeedsLayout];
+        [self layoutIfNeeded];
     }
 
     [super touchesCancelled:touchSet withEvent:event];
@@ -759,8 +759,6 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
  @Status Interoperable
 */
 - (void)dealloc {
-    [super dealloc];
-
     XamlRemovePointerEvents([_xamlButton comObj]);
     XamlRemoveLayoutEvent([_xamlButton comObj]);
 
@@ -772,6 +770,7 @@ static CGRect calculateContentRect(UIButton* self, CGSize size, CGRect contentRe
     }
 
     _xamlButton = nil;
+    [super dealloc];
 }
 
 /**

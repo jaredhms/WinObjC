@@ -104,6 +104,9 @@ CGContextRef CreateLayerContentsBitmapContext32(int width, int height);
 
     _shapeImage.position = bbox.origin;
 
+    // Set the sublayer's bounds so it's visible
+    _shapeImage.bounds = self.bounds;
+
     if (_fillColor) {
         CGContextAddPath(drawContext, _path);
         CGContextSetFillColorWithColor(drawContext, _fillColor);
@@ -222,7 +225,7 @@ CGContextRef CreateLayerContentsBitmapContext32(int width, int height);
     if (self = [super init]) {
         _shapeImage = [CALayer new];
         _shapeImage.anchorPoint = CGPointMake(0.0f, 0.0f);
-        _shapeImage.contentsGravity = kCAGravityBottomLeft;
+        _shapeImage.contentsGravity = kCAGravityTopLeft;
         _shapeImage.contentsScale = self.contentsScale;
         _shapeImage.delegate = self;
 

@@ -68,9 +68,6 @@ internal:
 // TODO: Everything below should/can probably go into a separate helper ref class
 
     // AnchorPoint
-    static property Windows::UI::Xaml::DependencyProperty^ AnchorPointProperty {
-        Windows::UI::Xaml::DependencyProperty^ get();
-    }
     static float GetAnchorPointX(Windows::UI::Xaml::FrameworkElement^ element);
     static void SetAnchorPointX(Windows::UI::Xaml::FrameworkElement^ element, float value);
     static float GetAnchorPointY(Windows::UI::Xaml::FrameworkElement^ element);
@@ -80,9 +77,6 @@ internal:
     static Platform::String^ GetAnchorYTransformPath();
 
     // Origin
-    static property Windows::UI::Xaml::DependencyProperty^ OriginProperty {
-        Windows::UI::Xaml::DependencyProperty^ get();
-    }
     static float GetOriginX(Windows::UI::Xaml::FrameworkElement^ element);
     static void SetOriginX(Windows::UI::Xaml::FrameworkElement^ element, float value);
     static float GetOriginY(Windows::UI::Xaml::FrameworkElement^ element);
@@ -92,9 +86,6 @@ internal:
     static Platform::String^ GetOriginYTransformPath();
 
     // Position
-    static property Windows::UI::Xaml::DependencyProperty^ PositionProperty {
-        Windows::UI::Xaml::DependencyProperty^ get();
-    }
     static float GetPositionX(Windows::UI::Xaml::FrameworkElement^ element);
     static void SetPositionX(Windows::UI::Xaml::FrameworkElement^ element, float value);
     static float GetPositionY(Windows::UI::Xaml::FrameworkElement^ element);
@@ -118,30 +109,16 @@ internal:
     static Platform::String^ GetTranslationYTransformPath();
 
     // VisualWidth
-    static property Windows::UI::Xaml::DependencyProperty^ VisualWidthProperty {
-        Windows::UI::Xaml::DependencyProperty^ get();
-    }
     static double GetVisualWidth(Windows::UI::Xaml::FrameworkElement^ element);
     static void SetVisualWidth(Windows::UI::Xaml::FrameworkElement^ element, double value);
 
     // VisualHeight
-    static property Windows::UI::Xaml::DependencyProperty^ VisualHeightProperty {
-        Windows::UI::Xaml::DependencyProperty^ get();
-    }
     static double GetVisualHeight(Windows::UI::Xaml::FrameworkElement^ element);
     static void SetVisualHeight(Windows::UI::Xaml::FrameworkElement^ element, double value);
 
     // ContentGravity
-    static property Windows::UI::Xaml::DependencyProperty^ ContentGravityProperty {
-        Windows::UI::Xaml::DependencyProperty^ get();
-    }
     static ContentGravity GetContentGravity(Windows::UI::Xaml::FrameworkElement^ element);
     static void SetContentGravity(Windows::UI::Xaml::FrameworkElement^ element, ContentGravity value);
-
-    // ContentSize
-    static property Windows::UI::Xaml::DependencyProperty^ ContentSizeProperty {
-        Windows::UI::Xaml::DependencyProperty^ get();
-    }
 
 internal:
     // Animation Support
@@ -173,7 +150,8 @@ private:
     static void _ApplyContentGravity(Windows::UI::Xaml::FrameworkElement^ element, ContentGravity gravity);
     static Windows::Foundation::Size _GetContentSize(Windows::UI::Xaml::FrameworkElement^ element);
     static void _SetContentSize(Windows::UI::Xaml::FrameworkElement^ element, Windows::Foundation::Size value);
-    static void _SizeChangedCallback(Windows::UI::Xaml::DependencyObject^ sender, Windows::UI::Xaml::DependencyPropertyChangedEventArgs^ args);
+    static void _VisualWidthChangedCallback(Windows::UI::Xaml::DependencyObject^ sender, Windows::UI::Xaml::DependencyPropertyChangedEventArgs^ args);
+    static void _VisualHeightChangedCallback(Windows::UI::Xaml::DependencyObject^ sender, Windows::UI::Xaml::DependencyPropertyChangedEventArgs^ args);
 };
 
 } /* namespace CoreAnimation */

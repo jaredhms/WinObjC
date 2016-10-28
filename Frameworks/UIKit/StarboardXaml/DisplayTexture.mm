@@ -105,65 +105,44 @@ DisplayTexture::DisplayTexture(CGImageRef img) {
         const void* data = NULL;
         bool freeData = false;
         int len = 0;
+        StrongId<NSData> fileData;
 
         switch (img->_imgType) {
-            case CGImageTypePNG: {
-                CGPNGImageBacking* pngImg = (CGPNGImageBacking*)img->Backing();
+        case CGImageTypePNG: {
+            CGPNGImageBacking* pngImg = (CGPNGImageBacking*)img->Backing();
 
-                if (pngImg->_fileName) {
-                    EbrFile* fpIn;
-                    fpIn = EbrFopen(pngImg->_fileName, "rb");
-                    if (!fpIn) {
-                        FAIL_FAST();
-                    }
-                    EbrFseek(fpIn, 0, SEEK_END);
-                    int fileLen = EbrFtell(fpIn);
-                    EbrFseek(fpIn, 0, SEEK_SET);
-                    void* pngData = (void*)IwMalloc(fileLen);
-                    len = EbrFread(pngData, 1, fileLen, fpIn);
-                    EbrFclose(fpIn);
+            if (pngImg->_fileName) {
+                fileData.attach([[NSData alloc] initWithContentsOfFile:[NSString stringWithUTF8String : pngImg->_fileName]]);
+                data = [fileData bytes];
+                len = [fileData length];
+            }
+            else {
+                data = [(NSData*)pngImg->_data bytes];
+                len = [(NSData*)pngImg->_data length];
+            }
+        } break;
 
-                    data = pngData;
-                    freeData = true;
-                } else {
-                    data = [(NSData*)pngImg->_data bytes];
-                    len = [(NSData*)pngImg->_data length];
-                }
-            } break;
+        case CGImageTypeJPEG: {
+            CGJPEGImageBacking* jpgImg = (CGJPEGImageBacking*)img->Backing();
 
-            case CGImageTypeJPEG: {
-                CGJPEGImageBacking* jpgImg = (CGJPEGImageBacking*)img->Backing();
-
-                if (jpgImg->_fileName) {
-                    EbrFile* fpIn;
-                    fpIn = EbrFopen(jpgImg->_fileName, "rb");
-                    if (!fpIn) {
-                        FAIL_FAST();
-                    }
-                    EbrFseek(fpIn, 0, SEEK_END);
-                    int fileLen = EbrFtell(fpIn);
-                    EbrFseek(fpIn, 0, SEEK_SET);
-                    void* imgData = (void*)IwMalloc(fileLen);
-                    len = EbrFread(imgData, 1, fileLen, fpIn);
-                    EbrFclose(fpIn);
-
-                    data = imgData;
-                    freeData = true;
-                } else {
-                    data = [(NSData*)jpgImg->_data bytes];
-                    len = [(NSData*)jpgImg->_data length];
-                }
-            } break;
-            default:
-                TraceError(TAG, L"Warning: unrecognized image format sent to DisplayTextureContent!");
-                break;
+            if (jpgImg->_fileName) {
+                fileData.attach([[NSData alloc] initWithContentsOfFile:[NSString stringWithUTF8String : jpgImg->_fileName]]);
+                data = [fileData bytes];
+                len = [fileData length];
+            }
+            else {
+                data = [(NSData*)jpgImg->_data bytes];
+                len = [(NSData*)jpgImg->_data length];
+            }
+        } break;
+        default:
+            TraceError(TAG, L"Warning: unrecognized image format sent to DisplayTextureContent!");
+            break;
         }
-        _xamlImage = ::CreateBitmapFromImageData(data, len);
-        if (freeData) {
-            IwFree((void*)data);
-        }
+        _xamlImage = CreateBitmapFromImageData(data, len);
         return;
     }
+    _lockPtr = nullptr;
 
     int texWidth = img->Backing()->Width();
     int texHeight = img->Backing()->Height();
@@ -212,7 +191,7 @@ DisplayTexture::DisplayTexture(CGImageRef img) {
     int width = pTexImage->Backing()->Width();
     int height = pTexImage->Backing()->Height();
 
-    _xamlImage = ::CreateBitmapFromBits(data, width, height, bytesPerRow);
+    _xamlImage = CreateBitmapFromBits(data, width, height, bytesPerRow);
 
     pTexImage->Backing()->ReleaseImageData();
     img->Backing()->DiscardIfPossible();

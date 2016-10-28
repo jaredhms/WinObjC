@@ -94,7 +94,7 @@ void SetTextControlContentVerticalAlignment(WXCControl* control, WXVerticalAlign
     // backing xaml textbox and passwordBox
     StrongId<UIView> _subView; // Container UIView for the Xaml textbox or passwordbox
     StrongId<WXCTextBox> _textBox; // Backing xaml textbox
-    StrongId<WXCTextBox> _passwordBox; // Backing xaml passwordbox
+    StrongId<WXCPasswordBox> _passwordBox; // Backing xaml passwordbox
 
     // lock use to access the properties
     StrongId<NSRecursiveLock> _secureModeLock;

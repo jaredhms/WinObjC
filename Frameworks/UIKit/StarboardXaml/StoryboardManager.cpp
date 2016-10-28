@@ -142,7 +142,11 @@ void StoryboardManager::_CreateFlip(Layer^ layer, bool flipRight, bool invert, b
 
     if (removeFromParent) {
         fade1->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) {
-            VisualTreeHelper::DisconnectChildrenRecursive(layer);
+            // Remove the snapshot layer from the parent panel
+            auto parentPanel = safe_cast<Panel^>(layer->Parent);
+            unsigned int index = 0;
+            parentPanel->Children->IndexOf(layer, &index);
+            parentPanel->Children->RemoveAt(index);
         });
     } else {
         rotateAnim->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) {
@@ -187,7 +191,11 @@ void StoryboardManager::_CreateWoosh(Layer^ layer, bool fromRight, bool invert, 
 
     if (removeFromParent) {
         wooshAnim->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) {
-            VisualTreeHelper::DisconnectChildrenRecursive(layer);
+            // Remove the snapshot layer from the parent panel
+            auto parentPanel = safe_cast<Panel^>(layer->Parent);
+            unsigned int index = 0;
+            parentPanel->Children->IndexOf(layer, &index);
+            parentPanel->Children->RemoveAt(index);
         });
     } else {
         wooshAnim->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) {
@@ -204,10 +212,8 @@ void StoryboardManager::AddTransition(Layer^ realLayer, Layer^ snapshotLayer, St
         TimeSpan timeSpan = TimeSpan();
         timeSpan.Duration = (long long)(0.75 * c_hundredNanoSeconds);
         m_container->Duration = Duration(timeSpan);
-        
-        auto wtf = VisualTreeHelper::GetParent(realLayer);
 
-        Panel^ parent = (Panel^)VisualTreeHelper::GetParent(realLayer);
+        Panel^ parent = safe_cast<Panel^>(VisualTreeHelper::GetParent(realLayer));
 
         bool flipToLeft = true;
         if (subtype != "kCATransitionFromLeft") {

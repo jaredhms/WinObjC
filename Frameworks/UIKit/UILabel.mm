@@ -111,9 +111,8 @@
     }
 
     /////////////////////////////////////////////////////////////////////////////
-    // TODO: Call when we can get it to compile (waiting on Muktesh's changes
     // TODO: Make sure MM renders properly with/without this
-    // [_textBlock setFontFamily:WUXFontFamilyFromUIFontName(_font fontName)];
+    [_textBlock setFontFamily:[WUXMFontFamily makeInstanceWithName:[_font fontName]]];
 
     [_textBlock setTextAlignment:ConvertUITextAlignmentToWXTextAlignment(_alignment)];
 
@@ -177,7 +176,7 @@
 
         UIFont* font = [coder decodeObjectForKey:@"UIFont"];
         if (font == nil) {
-            font = [UIFont fontWithName:@"Helvetica" size:[UIFont labelFontSize]];
+            font = [UIFont fontWithName:@"Segoe UI" size:[UIFont labelFontSize]];
         }
         [self setFont:font];
 
@@ -244,9 +243,8 @@
 
     _alignment = UITextAlignmentLeft;
     _lineBreakMode = UILineBreakModeTailTruncation;
-    [self setFont:[UIFont fontWithName:@"Helvetica" size:[UIFont labelFontSize]]];
+    [self setFont:[UIFont fontWithName:@"Segoe UI" size:[UIFont labelFontSize]]];
     _textColor = [UIColor blackColor];
-    [self setBackgroundColor:[UIColor whiteColor]];
     _shadowColor = _textColor;
     _minimumFontSize = 8.0f;
     _numberOfLines = 1;
@@ -315,7 +313,7 @@
 */
 - (UIFont*)font {
     if (_font == nil) {
-        _font = [UIFont fontWithName:@"Helvetica" size:[UIFont labelFontSize]];
+        _font = [UIFont fontWithName:@"Segoe UI" size:[UIFont labelFontSize]];
     }
     return _font;
 }
@@ -577,7 +575,7 @@
     if (_text != nil) {
         UIFont* measurementFont = nil;
         if (_font == nil) {
-            [self setFont:[UIFont fontWithName:@"Helvetica" size:[UIFont labelFontSize]]];
+            [self setFont:[UIFont fontWithName:@"Segoe UI" size:[UIFont labelFontSize]]];
         }
 
         //  Grab the font at the original point size set in setFont:
@@ -674,7 +672,7 @@
 
     if (_text != nil) {
         if (_font == nil) {
-            [self setFont:[UIFont fontWithName:@"Helvetica" size:[UIFont labelFontSize]]];
+            [self setFont:[UIFont fontWithName:@"Segoe UI" size:[UIFont labelFontSize]]];
         }
 
         ret = [_text sizeWithFont:_font];

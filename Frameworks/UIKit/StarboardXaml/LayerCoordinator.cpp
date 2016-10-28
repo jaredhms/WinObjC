@@ -339,8 +339,8 @@ std::map<std::string, AnimatableProperty> s_animatableProperties = {
               // Calculate values to animate on the AnchorPoint transform
               // TODO: SHOULD WE JUST ANIMATE THEM DIRECTLY RATHER THAN DUPLICATING THIS LOGIC, OR PULL OUT TO SHARED LOCATION?
               float anchorPointX = LayerCoordinator::GetAnchorPointX(target);
-              fromValue = (-(fromValue) * anchorPointX);
-              toValue = (-(toValue) * anchorPointX);
+              fromValue = ((-fromValue) * anchorPointX);
+              toValue = ((-toValue) * anchorPointX);
               LayerCoordinator::AddAnimation(
                   LayerCoordinator::GetAnchorXTransformPath(),
                   target,
@@ -349,11 +349,8 @@ std::map<std::string, AnimatableProperty> s_animatableProperties = {
                   from ? static_cast<Object^>(fromValue) : nullptr,
                   toValue);
 
-              ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
               // Animate the VisualWidth property to the new value
-              // TODO: Why is this necessary - is it only necessary to re-render every frame?
               LayerCoordinator::AddAnimation("(LayerCoordinator.VisualWidth)", target, storyboard, properties, from, to, true);
-              ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
           }),
           ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
               // Update our width
@@ -367,11 +364,8 @@ std::map<std::string, AnimatableProperty> s_animatableProperties = {
               auto anchorX = LayerCoordinator::GetAnchorTransform(target)->X;
               auto anchorY = LayerCoordinator::GetAnchorTransform(target)->Y;
 
-              ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
               // Update the VisualWidth property
-              // TODO: Why is this necessary - is it only necessary to re-render every frame?
               LayerCoordinator::SetVisualWidth(target, toWidth);
-              ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
               // Update the Clip rect if necessary
               if (target->Clip) {
@@ -403,11 +397,8 @@ std::map<std::string, AnimatableProperty> s_animatableProperties = {
                   from ? static_cast<Object^>(fromValue) : nullptr,
                   toValue);
 
-              //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
               // Animate the VisualHeight property to the new value
-              // TODO: Why is this necessary - is it only necessary to re-render every frame?
               LayerCoordinator::AddAnimation("(LayerCoordinator.VisualHeight)", target, storyboard, properties, from, to, true);
-              //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
           }),
           ApplyTransformFunction([](FrameworkElement^ target, Object^ toValue) {
               // Update our height
@@ -418,11 +409,8 @@ std::map<std::string, AnimatableProperty> s_animatableProperties = {
               double destY = -(toHeight) * LayerCoordinator::GetAnchorPointY(target);
               LayerCoordinator::GetAnchorTransform(target)->Y = destY;
 
-              //////////////////////////////////////////////////////////////////////////////////
               // Update the VisualHeight property
-              // TODO: Why is this necessary - is it only necessary to re-render every frame?
               LayerCoordinator::SetVisualHeight(target, toHeight);
-              //////////////////////////////////////////////////////////////////////////////////
 
               // Update the Clip rect if necessary
               if (target->Clip) {
@@ -570,6 +558,7 @@ std::map<std::string, AnimatableProperty> s_animatableProperties = {
               if (masksToBounds) {
                   // Set up our Clip geometry based on the visual/transformed width/height of the target
                   // TODO: Why can't we just use Width/Height here??
+                  //       It seems like we probably can??
                   auto clipGeometry = ref new RectangleGeometry();
                   clipGeometry->Rect = Rect(
                       0, 
@@ -619,8 +608,17 @@ void LayerCoordinator::InitializeFrameworkElement(FrameworkElement^ element) {
 
     // Grab Width/Height
     // These likely won't be set yet, but if not, we'll use 0 until the layer is resized
-    auto width = (std::isnan(element->Width) ? 0.0 : element->Width);
-    auto height = (std::isnan(element->Height) ? 0.0 : element->Height);
+    auto width = element->Width;
+    if (std::isnan(width)) {
+        width = 0.0;
+        element->Width = width;
+    }
+
+    auto height = element->Height;
+    if (std::isnan(height)) {
+        height = 0.0;
+        element->Height = height;
+    }
 
     // The anchor value modifies how the rest of the transforms are applied to this layer
     // Ideally we'd just set UIElement::RenderTransformOrigin, but that doesn't apply to TranslateTransforms
@@ -675,9 +673,10 @@ void LayerCoordinator::AnimateValue(
 }
 
 // CALayer content support
-void LayerCoordinator::SetContent(FrameworkElement^ element, ImageSource^ source, float width, float height, float scale) {
-    // Get content 
-    auto contentImage = _GetContentImage(element, true /* createIfPossible */);
+void LayerCoordinator::SetContent(FrameworkElement^ element, ImageSource^ source, float width, float height, float scale /* TODO: scale no longer needed?*/) {
+    // Get content
+    bool createIfPossible = (source != nullptr); // Only create the Image if we have a valid source to set
+    Image^ contentImage = _GetContentImage(element, createIfPossible);
     if (!contentImage) {
         return;
     }
@@ -687,9 +686,6 @@ void LayerCoordinator::SetContent(FrameworkElement^ element, ImageSource^ source
 
     // Store content size
     _SetContentSize(element, Size(width, height));
-
-    // Apply scale
-    // TODOTODOTODO:
 
     // Refresh any content center settings
     _ApplyContentCenter(element, _GetContentCenter(element));
@@ -796,14 +792,14 @@ void LayerCoordinator::_RegisterDependencyProperties() {
             double::typeid,
             FrameworkElement::typeid,
             ref new PropertyMetadata(0.0,
-            ref new PropertyChangedCallback(&LayerCoordinator::_SizeChangedCallback)));
+            ref new PropertyChangedCallback(&LayerCoordinator::_VisualWidthChangedCallback)));
 
         s_visualHeightProperty = DependencyProperty::RegisterAttached(
             "VisualHeight",
             double::typeid,
             FrameworkElement::typeid,
             ref new PropertyMetadata(0.0,
-            ref new PropertyChangedCallback(&LayerCoordinator::_SizeChangedCallback)));
+            ref new PropertyChangedCallback(&LayerCoordinator::_VisualHeightChangedCallback)));
 
         s_contentGravityProperty = DependencyProperty::RegisterAttached(
             "ContentGravity",
@@ -828,10 +824,6 @@ void LayerCoordinator::_RegisterDependencyProperties() {
 }
 
 // AnchorPoint
-DependencyProperty^ LayerCoordinator::AnchorPointProperty::get() {
-    return s_anchorPointProperty;
-}
-
 float LayerCoordinator::GetAnchorPointX(FrameworkElement^ element) {
     return static_cast<Point>(element->GetValue(s_anchorPointProperty)).X;
 }
@@ -875,10 +867,6 @@ String^ LayerCoordinator::GetAnchorYTransformPath() {
 }
 
 // Origin
-DependencyProperty^ LayerCoordinator::OriginProperty::get() {
-    return s_originProperty;
-}
-
 float LayerCoordinator::GetOriginX(FrameworkElement^ element) {
     return static_cast<Point>(element->GetValue(s_originProperty)).X;
 }
@@ -914,10 +902,6 @@ String^ LayerCoordinator::GetOriginYTransformPath() {
 }
 
 // Position
-DependencyProperty^ LayerCoordinator::PositionProperty::get() {
-    return s_positionProperty;
-}
-
 float LayerCoordinator::GetPositionX(FrameworkElement^ element) {
     return static_cast<Point>(element->GetValue(s_positionProperty)).X;
 }
@@ -1007,10 +991,6 @@ String^ LayerCoordinator::GetTranslationYTransformPath() {
 }
 
 // VisualWidth
-DependencyProperty^ LayerCoordinator::VisualWidthProperty::get() {
-    return s_visualWidthProperty;
-}
-
 double LayerCoordinator::GetVisualWidth(FrameworkElement^ element) {
     return static_cast<double>(element->GetValue(s_visualWidthProperty));
 }
@@ -1020,10 +1000,6 @@ void LayerCoordinator::SetVisualWidth(FrameworkElement^ element, double value) {
 }
 
 // VisualHeight
-DependencyProperty^ LayerCoordinator::VisualHeightProperty::get() {
-    return s_visualHeightProperty;
-}
-
 double LayerCoordinator::GetVisualHeight(FrameworkElement^ element) {
     return static_cast<double>(element->GetValue(s_visualHeightProperty));
 }
@@ -1032,24 +1008,27 @@ void LayerCoordinator::SetVisualHeight(FrameworkElement^ element, double value) 
     element->SetValue(s_visualHeightProperty, value);
 }
 
-void LayerCoordinator::_SizeChangedCallback(DependencyObject^ sender, DependencyPropertyChangedEventArgs^ args) {
+void LayerCoordinator::_VisualWidthChangedCallback(DependencyObject^ sender, DependencyPropertyChangedEventArgs^ args) {
     auto element = safe_cast<FrameworkElement^>(sender);
 
-    //////////////////////////////////////////////////////////////////////////////////////////////
-    // TODO: This is what we were doing before, but we should 
-    //       revisit whether or not we actually need this, as it can't be very performant...?
-    // element->InvalidateArrange();
-    //////////////////////////////////////////////////////////////////////////////////////////////
+    // Update the element's width accordingly
+    element->Width = safe_cast<double>(args->NewValue);
+
+    // Refresh any content gravity settings
+    _ApplyContentGravity(element, GetContentGravity(element));
+}
+
+void LayerCoordinator::_VisualHeightChangedCallback(DependencyObject^ sender, DependencyPropertyChangedEventArgs^ args) {
+    auto element = safe_cast<FrameworkElement^>(sender);
+
+    // Update the element's height accordingly
+    element->Height = safe_cast<double>(args->NewValue);
 
     // Refresh any content gravity settings
     _ApplyContentGravity(element, GetContentGravity(element));
 }
 
 // ContentGravity
-DependencyProperty^ LayerCoordinator::ContentGravityProperty::get() {
-    return s_contentGravityProperty;
-}
-
 ContentGravity LayerCoordinator::GetContentGravity(FrameworkElement^ element) {
     return static_cast<ContentGravity>(element->GetValue(s_contentGravityProperty));
 }
@@ -1064,13 +1043,12 @@ void LayerCoordinator::_ApplyContentGravity(FrameworkElement^ element, ContentGr
     Size contentSize = _GetContentSize(element);
     double widthAspect = element->Width / contentSize.Width;
     double heightAspect = element->Height / contentSize.Height;
+
     double minAspect = std::min<double>(widthAspect, heightAspect);
     double maxAspect = std::max<double>(widthAspect, heightAspect);
 
     // Apply gravity mapping
-    ////////////////////////////////////////////////////
-    float scale = 1.0; // TODO: GET SCALE SETTING
-    ////////////////////////////////////////////////////
+    double scale = 1.0; // TODO: Do we even need this anymore?  It doesn't look like it.
     HorizontalAlignment horizontalAlignment;
     VerticalAlignment verticalAlignment;
     double contentWidth = 0.0;
@@ -1189,10 +1167,6 @@ void LayerCoordinator::_ApplyContentGravity(FrameworkElement^ element, ContentGr
 }
 
 // ContentSize
-DependencyProperty^ LayerCoordinator::ContentSizeProperty::get() {
-    return s_contentSizeProperty;
-}
-
 Size LayerCoordinator::_GetContentSize(FrameworkElement^ element) {
     return static_cast<Size>(element->GetValue(s_contentSizeProperty));
 }

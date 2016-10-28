@@ -16,22 +16,6 @@
 #import "XamlUtilities.h"
 #import "StarboardXaml/DisplayTexture.h"
 
-// TOOD: Bug 8706843:Constructor or Helper to create FontFamily isn't projected - thus no way to create a FontFamily from Objective C side.
-// remove this once 8706843 is resolved
-#ifdef __OBJC__
-#pragma push_macro("interface")
-#ifndef interface
-#define interface struct
-#endif
-#pragma push_macro("Nil")
-#undef Nil
-#endif
-#include <RTHelpers.h>
-#ifdef __OBJC__
-#pragma pop_macro("Nil")
-#pragma pop_macro("interface")
-#endif
-
 #include <Windows.UI.Xaml.Media.h>
 
 using namespace Microsoft::WRL;
@@ -39,22 +23,6 @@ using namespace Windows::Foundation;
 
 // cornerRadius when border style is set to round rectangle
 static const int c_borderCornerRadius = 8;
-
-WUXMFontFamily* WUXFontFamilyFromUIFontName(NSString* uiFontName) {
-    // TOOD: Bug 8706843:Constructor or Helper to create FontFamily isn't projected - thus no way to create a FontFamily from Objective C
-    // side. we can remove all WRL related stuff and use projection API directly when it is ready
-    ComPtr<ABI::Windows::UI::Xaml::Media::IFontFamilyFactory> fontFamilyFactory;
-    ABI::Windows::Foundation::GetActivationFactory(Microsoft::WRL::Wrappers::HString::MakeReference(L"Windows.UI.Xaml.Media.FontFamily")
-                                                       .Get(),
-                                                   &fontFamilyFactory);
-    ComPtr<ABI::Windows::UI::Xaml::Media::IFontFamily> fontFamily;
-    auto fontName = Strings::NarrowToWide<HSTRING>(uiFontName);
-    fontFamilyFactory->CreateInstanceWithName(fontName.Get(), nullptr, nullptr, fontFamily.GetAddressOf());
-    /////////////////////////////////////////////////////////////////////////////
-    // TODO: Call when we can get it to compile (waiting on Muktesh's changes
-    // return [WUXMFontFamily createWith:fontFamily.Get()];
-    return nil;
-}
 
 WUColor* ConvertUIColorToWUColor(UIColor* uiColor) {
     CGFloat r, g, b, a;
