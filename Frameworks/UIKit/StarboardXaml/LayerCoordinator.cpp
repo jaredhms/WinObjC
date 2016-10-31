@@ -41,6 +41,7 @@ static const bool DEBUG_ALL = true;
 static const bool DEBUG_POSITION = DEBUG_ALL || false;
 static const bool DEBUG_ANCHORPOINT = DEBUG_ALL || false;
 static const bool DEBUG_SIZE = DEBUG_ALL || false;
+static const bool DEBUG_GRAVITY = DEBUG_ALL || true;
 
 namespace CoreAnimation {
 
@@ -1039,124 +1040,243 @@ void LayerCoordinator::SetContentGravity(FrameworkElement^ element, ContentGravi
 }
 
 void LayerCoordinator::_ApplyContentGravity(FrameworkElement^ element, ContentGravity gravity) {
-    // Calculate aspect ratio
-    Size contentSize = _GetContentSize(element);
-    double widthAspect = element->Width / contentSize.Width;
-    double heightAspect = element->Height / contentSize.Height;
 
-    double minAspect = std::min<double>(widthAspect, heightAspect);
-    double maxAspect = std::max<double>(widthAspect, heightAspect);
+    // Grab the content and containing element sizes
+    const Size contentSize = _GetContentSize(element);
+    const double elementWidth = element->Width;
+    const double elementHeight = element->Height;
 
     // Apply gravity mapping
     double scale = 1.0; // TODO: Do we even need this anymore?  It doesn't look like it.
     HorizontalAlignment horizontalAlignment;
     VerticalAlignment verticalAlignment;
-    double contentWidth = 0.0;
-    double contentHeight = 0.0;
+    double finalContentWidth = 0.0;
+    double finalContentHeight = 0.0;
+    double contentLeft = 0.0;
+    double contentTop = 0.0;
     switch (gravity) {
     case ContentGravity::Center:
+        // Determine horizontal/vertical alignment
         horizontalAlignment = HorizontalAlignment::Center;
         verticalAlignment = VerticalAlignment::Center;
-        contentWidth = contentSize.Width * scale;
-        contentHeight = contentSize.Height * scale;
+
+        // ContentGravity::Center does not resize the content
+        finalContentWidth = contentSize.Width * scale;
+        finalContentHeight = contentSize.Height * scale;
+
+        // Vertically and horizontally center the content within its containing layer.
+        contentLeft = (elementWidth / 2) - (contentSize.Width / 2);
+        contentTop = (elementHeight / 2) - (contentSize.Height / 2);
         break;
 
     case ContentGravity::Top:
+        // Determine horizontal/vertical alignment
         horizontalAlignment = HorizontalAlignment::Center;
         verticalAlignment = VerticalAlignment::Top;
-        contentWidth = contentSize.Width * scale;
-        contentHeight = contentSize.Height * scale;
+
+        // ContentGravity::Top does not resize the content
+        finalContentWidth = contentSize.Width * scale;
+        finalContentHeight = contentSize.Height * scale;
+
+        // Top-align and horizontally-center the content within its containing layer.
+        contentLeft = (elementWidth / 2) - (contentSize.Width / 2);
+        contentTop = 0;
         break;
 
     case ContentGravity::Bottom:
+        // Determine horizontal/vertical alignment
         horizontalAlignment = HorizontalAlignment::Center;
         verticalAlignment = VerticalAlignment::Bottom;
-        contentWidth = contentSize.Width * scale;
-        contentHeight = contentSize.Height * scale;
+
+        // ContentGravity::Bottom does not resize the content
+        finalContentWidth = contentSize.Width * scale;
+        finalContentHeight = contentSize.Height * scale;
+
+        // Bottom-align and horizontally-center the content within its containing layer.
+        contentLeft = (elementWidth / 2) - (contentSize.Width / 2);
+        contentTop = (elementHeight - contentSize.Height);
         break;
 
     case ContentGravity::Left:
+        // Determine horizontal/vertical alignment
         horizontalAlignment = HorizontalAlignment::Left;
         verticalAlignment = VerticalAlignment::Center;
-        contentWidth = contentSize.Width * scale;
-        contentHeight = contentSize.Height * scale;
+
+        // ContentGravity::Left does not resize the content
+        finalContentWidth = contentSize.Width * scale;
+        finalContentHeight = contentSize.Height * scale;
+
+        // Left-align and vertically-center the content within its containing layer.
+        contentLeft = 0;
+        contentTop = (elementHeight / 2) - (contentSize.Height / 2);
         break;
 
     case ContentGravity::Right:
+        // Determine horizontal/vertical alignment
         horizontalAlignment = HorizontalAlignment::Right;
         verticalAlignment = VerticalAlignment::Center;
-        contentWidth = contentSize.Width * scale;
-        contentHeight = contentSize.Height * scale;
+
+        // ContentGravity::Right does not resize the content
+        finalContentWidth = contentSize.Width * scale;
+        finalContentHeight = contentSize.Height * scale;
+
+        // Right-align and vertically-center the content within its containing layer.
+        contentLeft = (elementWidth - contentSize.Width);
+        contentTop = (elementHeight / 2) - (contentSize.Height / 2);
         break;
 
     case ContentGravity::TopLeft:
+        // Determine horizontal/vertical alignment
         horizontalAlignment = HorizontalAlignment::Left;
         verticalAlignment = VerticalAlignment::Top;
-        contentWidth = contentSize.Width * scale;
-        contentHeight = contentSize.Height * scale;
+
+        // ContentGravity::TopLeft does not resize the content
+        finalContentWidth = contentSize.Width * scale;
+        finalContentHeight = contentSize.Height * scale;
+
+        // Left and top align the content within its containing layer.
+        contentLeft = 0;
+        contentTop = 0;
         break;
 
     case ContentGravity::TopRight:
+        // Determine horizontal/vertical alignment
         horizontalAlignment = HorizontalAlignment::Right;
         verticalAlignment = VerticalAlignment::Top;
-        contentWidth = contentSize.Width * scale;
-        contentHeight = contentSize.Height * scale;
+
+        // ContentGravity::TopRight does not resize the content
+        finalContentWidth = contentSize.Width * scale;
+        finalContentHeight = contentSize.Height * scale;
+
+        // Right and top align the content within its containing layer.
+        contentLeft = (elementWidth - contentSize.Width);
+        contentTop = 0;
         break;
 
     case ContentGravity::BottomLeft:
+        // Determine horizontal/vertical alignment
         horizontalAlignment = HorizontalAlignment::Left;
         verticalAlignment = VerticalAlignment::Bottom;
-        contentWidth = contentSize.Width * scale;
-        contentHeight = contentSize.Height * scale;
+
+        // ContentGravity::BottomLeft does not resize the content
+        finalContentWidth = contentSize.Width * scale;
+        finalContentHeight = contentSize.Height * scale;
+
+        // Left and bottom align the content within its containing layer.
+        contentLeft = 0;
+        contentTop = (elementHeight - contentSize.Height);
         break;
 
     case ContentGravity::BottomRight:
+        // Determine horizontal/vertical alignment
         horizontalAlignment = HorizontalAlignment::Right;
         verticalAlignment = VerticalAlignment::Bottom;
-        contentWidth = contentSize.Width * scale;
-        contentHeight = contentSize.Height * scale;
+
+        // ContentGravity::BottomRight does not resize the content
+        finalContentWidth = contentSize.Width * scale;
+        finalContentHeight = contentSize.Height * scale;
+
+        // Right and bottom align the content within its containing layer.
+        contentLeft = (elementWidth - contentSize.Width);
+        contentTop = (elementHeight - contentSize.Height);
         break;
 
     case ContentGravity::Resize:
-        // UIViewContentModeScaleToFill;
+        // Determine horizontal/vertical alignment
         horizontalAlignment = HorizontalAlignment::Left;
         verticalAlignment = VerticalAlignment::Top;
-        contentWidth = element->Width * scale;
-        contentHeight = element->Height * scale;
+
+        // Resize content to that of its containing layer
+        finalContentWidth = elementWidth * scale;
+        finalContentHeight = elementHeight * scale;
+
+        // Completely fill/align the content within its containing layer.
+        contentLeft = 0;
+        contentTop = 0;
         break;
 
-    // UIViewContentModeScaleAspectFit
     case ContentGravity::ResizeAspect:
-        // Center the image
-        horizontalAlignment = HorizontalAlignment::Center;
-        verticalAlignment = VerticalAlignment::Center;
+        {
+            // Determine horizontal/vertical alignment
+            horizontalAlignment = HorizontalAlignment::Center;
+            verticalAlignment = VerticalAlignment::Center;
 
-        // Scale the image with the smaller aspect.
-        contentWidth = contentSize.Width * static_cast<float>(minAspect) * scale;
-        contentHeight = contentSize.Height * static_cast<float>(minAspect) * scale;
-        break;
+            // Resize the content to fit within its containing layer, while retaining its
+            // aspect ratio.
+            const double widthAspect = elementWidth / contentSize.Width;
+            const double heightAspect = elementHeight / contentSize.Height;
+            const double minAspect = std::min<double>(widthAspect, heightAspect);
+            finalContentWidth = (contentSize.Width * static_cast<float>(minAspect) * scale);
+            finalContentHeight = (contentSize.Height * static_cast<float>(minAspect) * scale);
 
-    // UIViewContentModeScaleAspectFill
-    case ContentGravity::ResizeAspectFill:
-        // Center the image
-        horizontalAlignment = HorizontalAlignment::Center;
-        verticalAlignment = VerticalAlignment::Center;
+            // Vertically and horizontally center the content within its containing layer
+            contentLeft = (elementWidth / 2) - (finalContentWidth / 2);
+            contentTop = (elementHeight / 2) - (finalContentHeight / 2);
+            break;
+        }
 
-        // Scale the image with the larger aspect.
-        contentWidth = contentSize.Width * static_cast<float>(maxAspect);
-        contentHeight = contentSize.Height * static_cast<float>(maxAspect);
-        break;
+    case ContentGravity::ResizeAspectFill: 
+        {
+            // Determine horizontal/vertical alignment
+            horizontalAlignment = HorizontalAlignment::Center;
+            verticalAlignment = VerticalAlignment::Center;
+
+            // Resize the content to fill its containing layer, while retaining its
+            // aspect ratio.
+            const double widthAspect = elementWidth / contentSize.Width;
+            const double heightAspect = elementHeight / contentSize.Height;
+            const double maxAspect = std::max<double>(widthAspect, heightAspect);
+            finalContentWidth = contentSize.Width * static_cast<float>(maxAspect);
+            finalContentHeight = contentSize.Height * static_cast<float>(maxAspect);
+
+            // Vertically and horizontally center the content within its containing layer
+            contentLeft = (elementWidth / 2) - (finalContentWidth / 2);
+            contentTop = (elementHeight / 2) - (finalContentHeight / 2);
+            break; 
+        }
+    }
+
+    if (DEBUG_GRAVITY) {
+        TraceVerbose(
+            TAG,
+            L"Applying content gravity (%ws); elementSize=%fx%f; contentSize=%fx%f; contentLeft=%f; contentTop=%f",
+            gravity.ToString()->Data(),
+            elementWidth,
+            elementHeight,
+            finalContentWidth,
+            finalContentHeight,
+            contentLeft,
+            contentTop);
     }
 
     // Do we have content?
     Image^ image = _GetContentImage(element);
     if (image) {
+        // Set the image's size
+        image->Width = finalContentWidth;
+        image->Height = finalContentHeight;
+
         // Using Fill since we calculate the aspect/size ourselves
         image->Stretch = Stretch::Fill;
 
-        // Only resize the content image if we have one
-        image->Width = contentWidth;
-        image->Height = contentHeight;
+        // We currently have to position via Canvas top/left, rather than a Grid, to prevent
+        // clipping of the image (Canvas doesn't clip its children, but Grid does).
+        // So log a warning if the image isn't in a Canvas.
+        if (image->Parent && !dynamic_cast<Canvas^>(image->Parent)) {
+            auto parent = image->Parent;
+            auto type = parent->GetType();
+            auto name = type->FullName;
+            auto data = name->Data();
+
+            TraceWarning(
+                TAG,
+                L"Positioning of layer content only works within Canvas elements, but this image is within a %ws.",
+                image->Parent->GetType()->FullName->Data());
+        }
+
+        // Position the image within its parent
+        image->SetValue(Canvas::LeftProperty, contentLeft);
+        image->SetValue(Canvas::TopProperty, contentTop);
     }
 
     // If we don't have content, apply the gravity alignment directly to the target FrameworkElement,
