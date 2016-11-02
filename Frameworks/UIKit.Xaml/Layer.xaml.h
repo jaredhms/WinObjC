@@ -75,10 +75,9 @@ public:
 private:
     // Layer elements; created on demand
     Windows::UI::Xaml::Controls::Image^ _content;
-    Windows::UI::Xaml::Controls::Canvas^ _sublayerCanvas;
 
     // Dependency properties for adding layer-like functionality to any FrameworkElement
-    static void _registerDependencyProperties();
+    static void _RegisterDependencyProperties();
     static bool s_dependencyPropertiesRegistered;
     static Windows::UI::Xaml::DependencyProperty^ s_layerContentProperty;
     static Windows::UI::Xaml::DependencyProperty^ s_sublayerCanvasProperty;

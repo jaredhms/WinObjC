@@ -24,6 +24,7 @@ using namespace Microsoft::WRL;
 using namespace Platform;
 using namespace Windows::UI::Xaml;
 using namespace Windows::UI::Xaml::Controls;
+using namespace Windows::UI::Xaml::Media;
 
 namespace UIKit {
 namespace Private {
@@ -37,9 +38,13 @@ Layer::Layer() {
     InitializeComponent();
 
     // No-op if already registered
-    _registerDependencyProperties();
+    _RegisterDependencyProperties();
 
     Name = L"Layer";
+
+    // Default to a transparent background brush so we can accept pointer input
+    static auto transparentBrush = ref new SolidColorBrush(Windows::UI::Colors::Transparent);
+    Background = transparentBrush;
 }
 
 // Accessor for our Layer content
@@ -60,13 +65,7 @@ bool Layer::HasLayerContent::get() {
 
 // Accessor for our SublayerCanvas
 Canvas^ Layer::SublayerCanvas::get() {
-    if (!_sublayerCanvas) {
-        _sublayerCanvas = ref new Canvas();
-        _sublayerCanvas->Name = "Sublayers";
-        Children->Append(_sublayerCanvas);
-    }
-
-    return _sublayerCanvas;
+    return this;
 }
 
 DependencyProperty^ Layer::LayerContentProperty::get() {
@@ -77,7 +76,7 @@ DependencyProperty^ Layer::SublayerCanvasProperty::get() {
     return s_sublayerCanvasProperty;
 }
 
-void Layer::_registerDependencyProperties() {
+void Layer::_RegisterDependencyProperties() {
     if (!s_dependencyPropertiesRegistered) {
         s_layerContentProperty = DependencyProperty::RegisterAttached("LayerContent",
             Image::typeid,

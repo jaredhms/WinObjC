@@ -144,9 +144,11 @@ void StoryboardManager::_CreateFlip(Layer^ layer, bool flipRight, bool invert, b
         fade1->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) {
             // Remove the snapshot layer from the parent panel
             auto parentPanel = safe_cast<Panel^>(layer->Parent);
-            unsigned int index = 0;
-            parentPanel->Children->IndexOf(layer, &index);
-            parentPanel->Children->RemoveAt(index);
+            if (parentPanel) {
+                unsigned int index = 0;
+                parentPanel->Children->IndexOf(layer, &index);
+                parentPanel->Children->RemoveAt(index);
+            }
         });
     } else {
         rotateAnim->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) {
@@ -193,9 +195,11 @@ void StoryboardManager::_CreateWoosh(Layer^ layer, bool fromRight, bool invert, 
         wooshAnim->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) {
             // Remove the snapshot layer from the parent panel
             auto parentPanel = safe_cast<Panel^>(layer->Parent);
-            unsigned int index = 0;
-            parentPanel->Children->IndexOf(layer, &index);
-            parentPanel->Children->RemoveAt(index);
+            if (parentPanel) {
+                unsigned int index = 0;
+                parentPanel->Children->IndexOf(layer, &index);
+                parentPanel->Children->RemoveAt(index);
+            }
         });
     } else {
         wooshAnim->Completed += ref new EventHandler<Object^>([layer](Object^ sender, Object^ args) {

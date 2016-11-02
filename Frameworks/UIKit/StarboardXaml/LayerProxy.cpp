@@ -122,6 +122,13 @@ void LayerProxy::_SetContentsCenter(float x, float y, float width, float height)
 void LayerProxy::SetTopMost() {
     FrameworkElement^ xamlLayer = _FrameworkElementFromInspectable(_xamlElement);
     _topMost = true;
+
+    // If the element is a Panel, set its background to nullptr so it can't
+    // accept pointer input.  
+    // Note: we should probably find a cleaner way to handle our top-level UIWindows' layers.
+    if (dynamic_cast<Panel^>(xamlLayer)) {
+        dynamic_cast<Panel^>(xamlLayer)->Background = nullptr;
+    }
 }
 
 void LayerProxy::_SetBackgroundColor(float r, float g, float b, float a) {

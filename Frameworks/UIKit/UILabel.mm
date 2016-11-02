@@ -110,15 +110,10 @@
         [_textBlock setFontStyle:WUTFontStyleNormal];
     }
 
-    /////////////////////////////////////////////////////////////////////////////
-    // TODO: Make sure MM renders properly with/without this
-    [_textBlock setFontFamily:[WUXMFontFamily makeInstanceWithName:[_font fontName]]];
+    [_textBlock setFontFamily:[WUXMFontFamily makeInstanceWithName:[_font _compatibleFamilyName]]];
 
     [_textBlock setTextAlignment:ConvertUITextAlignmentToWXTextAlignment(_alignment)];
 
-    [_textBlock setLineStackingStrategy:WXLineStackingStrategyBlockLineHeight];
-
-    // The first 'welcome' label is truncated vertically
     [_textBlock setLineHeight:[_font ascender] - [_font descender]];
 
     switch (_lineBreakMode) {
@@ -194,7 +189,7 @@
         if ([coder containsValueForKey:@"UILineBreakMode"]) {
             _lineBreakMode = (UILineBreakMode)[coder decodeInt32ForKey:@"UILineBreakMode"];
         } else {
-            _lineBreakMode = UILineBreakModeTailTruncation;
+            _lineBreakMode = UILineBreakModeCharacterWrap;
         }
         if ([coder containsValueForKey:@"UIShadowOffset"]) {
             id obj = [coder decodeObjectForKey:@"UIShadowOffset"];
@@ -242,7 +237,7 @@
     _textBlock = textBlock;
 
     _alignment = UITextAlignmentLeft;
-    _lineBreakMode = UILineBreakModeTailTruncation;
+    _lineBreakMode = UILineBreakModeCharacterWrap;
     [self setFont:[UIFont fontWithName:@"Segoe UI" size:[UIFont labelFontSize]]];
     _textColor = [UIColor blackColor];
     _shadowColor = _textColor;
@@ -540,6 +535,13 @@
 */
 - (UIColor*)highlightedTextColor {
     return _highlightedTextColor;
+}
+
+/**
+@Status Stub
+*/
+-(void)drawTextInRect:(CGRect)rect {
+    UNIMPLEMENTED();
 }
 
 /**

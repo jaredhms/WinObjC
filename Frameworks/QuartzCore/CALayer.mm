@@ -191,9 +191,9 @@ static void DoDisplayList(CALayer* layer) {
 
         std::shared_ptr<IDisplayTexture> newTexture = [cur->self _getDisplayTexture];
         cur->needsDisplay = FALSE;
-        if (newTexture) {
-            [CATransaction _currentLayerTransaction]->SetLayerTexture(cur->_layerProxy, newTexture, cur->contentsSize, cur->contentsScale);
-        }
+
+        // Set the new (or null) display texture on the layer proxy backing this layer
+        [CATransaction _currentLayerTransaction]->SetLayerTexture(cur->_layerProxy, newTexture, cur->contentsSize, cur->contentsScale);
 
         [cur->self _displayChanged];
 
